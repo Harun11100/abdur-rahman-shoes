@@ -1,0 +1,371 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+
+export default function RestockProductForm() {
+  const router = useRouter();
+  
+  // Form State Engines
+  const [formType, setFormType] = useState("new"); // "new" (Fresh Catalog Addition) or "restock" (Existing Item Inbound)
+  const [prodName, setProdName] = useState("");
+  const [prodCode, setProdCode] = useState("");
+  const [modelNumber, setModelNumber] = useState("");
+  const [costPrice, setCostPrice] = useState("");
+  const [sellingPrice, setSellingPrice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Shoe Shop Variant States
+  const availableSizes = ["6", "7", "8", "9", "10", "11"];
+  const [selectedSize, setSelectedSize] = useState("8"); // Default focused shoe size
+  
+  // Track quantities dynamically per size variant
+  const [sizeQuantities, setSizeQuantities] = useState({
+    "6": "5", "7": "10", "8": "15", "9": "12", "10": "8", "11": "4"
+  });
+
+  // Counter helper handlers for current active size focus
+  const adjustQuantity = (amount) => {
+    const current = parseInt(sizeQuantities[selectedSize], 10) || 0;
+    const computed = current + amount;
+    const updatedValue = computed >= 0 ? String(computed) : "0";
+    
+    setSizeQuantities({
+      ...sizeQuantities,
+      [selectedSize]: updatedValue,
+    });
+  };
+
+  const handleManualQtyChange = (text) => {
+    setSizeQuantities({
+      ...sizeQuantities,
+      [selectedSize]: text.replace(/[^0-9]/g, ""), // Only numeric inputs
+    });
+  };
+
+  const handleFormSubmit = async () => {
+    // Structural Field Validations
+    if (formType === "new" && (!prodName.trim() || !prodCode.trim() || !sellingPrice.trim())) {
+      Alert.alert("Required Fields Missing", "Please provide a Shoe Model Name, Unique Code/SKU, and Retail Selling Price.");
+      return;
+    }
+    if (formType === "restock" && !prodCode.trim()) {
+      Alert.alert("Required Fields Missing", "Please scan or enter the target Shoe Base SKU.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Simulating API catalog execution delays
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      
+      const targetedQty = sizeQuantities[selectedSize];
+      
+      Alert.alert(
+        "Inventory Logged", 
+        formType === "new" 
+          ? `"${prodName}" has been added to your catalog grid with variant stock matrices.`
+          : `Size ${selectedSize} stock updated to ${targetedQty} pairs for SKU: ${prodCode.toUpperCase()}.`
+      );
+
+      // Reset form variables cleanly if fresh creation
+      if (formType === "new") {
+        setProdName("");
+        setProdCode("");
+        setModelNumber("");
+        setCostPrice("");
+        setSellingPrice("");
+        setSizeQuantities({"6": "0", "7": "0", "8": "0", "9": "0", "10": "0", "11": "0"});
+      }
+    } catch (error) {
+      Alert.alert("Operation Failed", "Could not synchronize the inbound shipment metrics.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Navigation Bar */}
+        <View style={styles.navHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back-outline" size={22} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Inbound Shoe Logistics</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Dynamic Entry Type Selector Tabs */}
+        <View style={styles.typeSelectorRow}>
+          <TouchableOpacity
+            style={[styles.typeTab, formType === "new" ? styles.activeTypeTab : null]}
+            onPress={() => setFormType("new")}
+          >
+            <Ionicons 
+              name="add-circle-outline" 
+              size={18} 
+              color={formType === "new" ? "#10B981" : "#64748B"} 
+            />
+            <Text style={[styles.typeTabText, formType === "new" ? styles.activeTypeTabText : null]}>
+              New Shoe Model
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.typeTab, formType === "restock" ? styles.activeTypeTab : null]}
+            onPress={() => setFormType("restock")}
+          >
+            <Ionicons 
+              name="refresh-circle-outline" 
+              size={18} 
+              color={formType === "restock" ? "#10B981" : "#64748B"} 
+            />
+            <Text style={[styles.typeTabText, formType === "restock" ? styles.activeTypeTabText : null]}>
+              Restock Existing Sizes
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Informational Subtitle */}
+        <View style={styles.infoSection}>
+          <Text style={styles.formSectionTitle}>
+            {formType === "new" ? "Register Fresh Footwear Profile" : "Inbound Variant Size Restock"}
+          </Text>
+          <Text style={styles.infoSubtitle}>
+            {formType === "new" 
+              ? "Creates a completely new product row inside your system ledger database." 
+              : "Increments localized storage metrics on an already initialized product barcode line."
+            }
+          </Text>
+        </View>
+
+        {/* Form Container */}
+        <View style={styles.cardForm}>
+          
+          {/* PRODUCT CODE / BASE SKU (Needed for both types) */}
+          <Text style={styles.inputLabel}>Base SKU / Barcode <Text style={styles.requiredAsterisk}>*</Text></Text>
+          <View style={styles.inputFieldBox}>
+            <Ionicons name="barcode-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g., NKE-AIRMAX-2026"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="characters"
+              value={prodCode}
+              onChangeText={setProdCode}
+            />
+          </View>
+
+          {/* DYNAMIC FIELD SECTIONS FOR NEW PRODUCTS ONLY */}
+          {formType === "new" && (
+            <>
+              <Text style={styles.inputLabel}>Shoe Model Name <Text style={styles.requiredAsterisk}>*</Text></Text>
+              <View style={styles.inputFieldBox}>
+                <Ionicons name="cube-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g., Nike Air Max Alpha"
+                  placeholderTextColor="#94A3B8"
+                  value={prodName}
+                  onChangeText={setProdName}
+                />
+              </View>
+
+              <Text style={styles.inputLabel}>Colorway / Article Code</Text>
+              <View style={styles.inputFieldBox}>
+                <Ionicons name="pricetag-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g., Black-Crimson-004"
+                  placeholderTextColor="#94A3B8"
+                  value={modelNumber}
+                  onChangeText={setModelNumber}
+                />
+              </View>
+            </>
+          )}
+
+          {/* DYNAMIC SIZE MATRIX CONTAINER (CRITICAL FOR SHOE SHOP) */}
+          <Text style={styles.inputLabel}>Select Variant Size (UK/US)</Text>
+          <View style={styles.sizeMatrixGrid}>
+            {availableSizes.map((size) => {
+              const isSelected = selectedSize === size;
+              const hasStock = parseInt(sizeQuantities[size], 10) > 0;
+              return (
+                <TouchableOpacity
+                  key={size}
+                  style={[
+                    styles.sizeBubble,
+                    isSelected ? styles.activeSizeBubble : null,
+                    !isSelected && hasStock ? styles.hasStockSizeBubble : null
+                  ]}
+                  onPress={() => setSelectedSize(size)}
+                >
+                  <Text style={[styles.sizeText, isSelected ? styles.activeSizeText : null]}>
+                    Size {size}
+                  </Text>
+                  <Text style={[styles.sizeStockIndicator, isSelected ? styles.activeSizeStockIndicator : null]}>
+                    ({sizeQuantities[size]} pairs)
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* QUANTITY COUNTER ADJUSTMENT FOR THE SELECTED SIZE */}
+          <Text style={styles.inputLabel}>
+            Modify Batch Intake for <Text style={styles.focusedSizeLabel}>Size {selectedSize}</Text> <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          <View style={styles.counterRow}>
+            <TouchableOpacity style={styles.counterBtn} onPress={() => adjustQuantity(-1)}>
+              <Ionicons name="remove" size={20} color="#0F172A" />
+            </TouchableOpacity>
+            
+            <TextInput
+              style={styles.counterInput}
+              keyboardType="number-pad"
+              value={sizeQuantities[selectedSize]}
+              onChangeText={handleManualQtyChange}
+              textAlign="center"
+            />
+
+            <TouchableOpacity style={styles.counterBtn} onPress={() => adjustQuantity(1)}>
+              <Ionicons name="add" size={20} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
+
+          {/* DYNAMIC PRICING SECTIONS */}
+          {formType === "new" && (
+            <View style={styles.pricingGridRow}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={styles.inputLabel}>Purchase Cost</Text>
+                <View style={styles.inputFieldBox}>
+                  <Text style={styles.currencySymbolPrefix}>৳</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="4200"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    value={costPrice}
+                    onChangeText={setCostPrice}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Retail MRP <Text style={styles.requiredAsterisk}>*</Text></Text>
+                <View style={styles.inputFieldBox}>
+                  <Text style={styles.currencySymbolPrefix}>৳</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="5800"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    value={sellingPrice}
+                    onChangeText={setSellingPrice}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* SUBMIT BUTTON TRIGGER CONTAINER */}
+          <TouchableOpacity
+            style={[styles.submitActionBtn, isSubmitting ? styles.disabledBtn : null]}
+            onPress={handleFormSubmit}
+            disabled={isSubmitting}
+            activeOpacity={0.8}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Ionicons name="cube-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.submitActionBtnText}>
+                  {formType === "new" ? "Save Shoe & Initialize Stock" : "Commit Size Updates"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  contentContainer: { padding: 20, paddingBottom: 60 },
+
+  // Navigation Header
+  navHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, marginBottom: 20 },
+  backButton: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
+  navTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+
+  // Operation Tab Pickers
+  typeSelectorRow: { flexDirection: "row", backgroundColor: "#F1F5F9", borderRadius: 10, padding: 4, marginBottom: 24 },
+  typeTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 8 },
+  activeTypeTab: { backgroundColor: "#FFF", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 1, elevation: 1 },
+  typeTabText: { fontSize: 13, color: "#64748B", fontWeight: "600", marginLeft: 6 },
+  activeTypeTabText: { color: "#0F172A", fontWeight: "700" },
+
+  // Information Context Line
+  infoSection: { marginBottom: 18 },
+  formSectionTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
+  infoSubtitle: { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 16 },
+
+  // Input Field Box Controls
+  cardForm: { backgroundColor: "#FFF", borderRadius: 16, borderStyle: "solid", borderWidth: 1, borderColor: "#E2E8F0", padding: 18, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
+  inputLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 8 },
+  requiredAsterisk: { color: "#EF4444" },
+  inputFieldBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, height: 46, marginBottom: 16, paddingHorizontal: 12 },
+  inputIcon: { marginRight: 8 },
+  currencySymbolPrefix: { fontSize: 15, fontWeight: "700", color: "#64748B", marginRight: 8 },
+  textInput: { flex: 1, color: "#0F172A", fontSize: 14, height: "100%", fontWeight: "500" },
+
+  // Shoe Size Grid Matrix Elements
+  sizeMatrixGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 18 },
+  sizeBubble: { width: "31%", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, paddingVertical: 10, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  hasStockSizeBubble: { borderColor: "#CBD5E1", backgroundColor: "#F1F5F9" },
+  activeSizeBubble: { backgroundColor: "#10B981", borderColor: "#10B981" },
+  sizeText: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  activeSizeText: { color: "#FFF" },
+  sizeStockIndicator: { fontSize: 10, color: "#64748B", marginTop: 2 },
+  activeSizeStockIndicator: { color: "#E6F4EA", fontWeight: "500" },
+  focusedSizeLabel: { color: "#10B981", fontWeight: "700" },
+
+  // Pricing Layout Grid Split Row
+  pricingGridRow: { flexDirection: "row", justifyContent: "space-between" },
+
+  // Advanced Quantity Counter Components 
+  counterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, height: 48, paddingHorizontal: 6, marginBottom: 20 },
+  counterBtn: { width: 38, height: 38, borderRadius: 8, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 1, elevation: 1 },
+  counterInput: { flex: 1, fontSize: 16, fontWeight: "700", color: "#0F172A", height: "100%" },
+
+  // Submission Modules
+  submitActionBtn: { height: 48, backgroundColor: "#10B981", borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 8, shadowColor: "#10B981", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
+  disabledBtn: { opacity: 0.6 },
+  submitActionBtnText: { color: "#FFF", fontSize: 15, fontWeight: "600" },
+});
