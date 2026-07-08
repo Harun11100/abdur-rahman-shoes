@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "172128934696",
+    "project_id": "abdur-rahman-shoes",
+    "storage_bucket": "abdur-rahman-shoes.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:172128934696:android:dc5c9e17da579049b24e1d",
+        "android_client_info": {
+          "package_name": "com.mdharun.abdurrahmanshoes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmcEmVidf0ghxnWD7NgrXwllB96eYR3-Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
