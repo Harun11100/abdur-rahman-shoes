@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -53,13 +54,38 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerSection}>
-          <View style={[styles.logoIconBg, { backgroundColor: activeBgLight }]}>
-            <Ionicons name="footprint-outline" size={32} color={activeColor} />
-          </View>
-          <Text style={styles.brandTitle}>SoleControl</Text>
-          <Text style={styles.brandSubtitle}>Inventory & Stock Management</Text>
-        </View>
+       <View style={styles.headerSection}>
+  <View style={styles.brandRow}>
+    <View
+      style={[
+        styles.logoContainer,
+        { backgroundColor: activeBgLight },
+      ]}
+    >
+      <Image
+        source={require("../../assets/images/icon.png")}
+        style={styles.logo}
+      />
+    </View>
+
+    <View style={styles.brandTextContainer}>
+      <Text style={styles.brandTitle}>
+        SoleControl
+      </Text>
+
+      <Text style={styles.brandSubtitle}>
+        Smart Inventory Management
+      </Text>
+    </View>
+  </View>
+
+  <View style={styles.statusBadge}>
+    <View style={styles.statusDot} />
+    <Text style={styles.statusText}>
+      Stock System Active
+    </Text>
+  </View>
+</View>
 
         <View style={styles.tabContainer}>
           <TouchableOpacity
@@ -165,10 +191,83 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   scrollContainer: { flexGrow: 1, justifyContext: "center", padding: 24, justifyContent: "center" },
-  headerSection: { alignItems: "center", marginBottom: 32 },
-  logoIconBg: { width: 64, height: 64, borderRadius: 18, alignItems: "center", justifyContent: "center", marginBottom: 16 },
-  brandTitle: { fontSize: 28, fontWeight: "700", color: "#0F172A" },
-  brandSubtitle: { fontSize: 14, color: "#64748B", marginTop: 4 },
+ headerSection: {
+  paddingHorizontal: 24,
+  paddingTop: 25,
+  paddingBottom: 20,
+},
+
+brandRow: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+logoContainer: {
+  width: 84,
+  height: 84,
+  borderRadius: 20,
+  alignItems: "center",
+  justifyContent: "center",
+
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 8,
+  },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 5,
+},
+
+logo: {
+  width: 80,
+  height: 80,
+},
+
+brandTextContainer: {
+  marginLeft: 16,
+},
+
+brandTitle: {
+  fontSize: 26,
+  fontWeight: "800",
+  color: "#111827",
+  letterSpacing: -0.5,
+},
+
+brandSubtitle: {
+  marginTop: 4,
+  fontSize: 14,
+  color: "#6B7280",
+  fontWeight: "500",
+},
+
+statusBadge: {
+  marginTop: 18,
+  alignSelf: "flex-start",
+
+  flexDirection: "row",
+  alignItems: "center",
+
+  backgroundColor: "#F0FDF4",
+  paddingHorizontal: 12,
+  paddingVertical: 7,
+  borderRadius: 20,
+},
+
+statusDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: "#22C55E",
+  marginRight: 8,
+},
+
+statusText: {
+  fontSize: 12,
+  fontWeight: "600",
+  color: "#16A34A",
+},
   tabContainer: { flexDirection: "row", backgroundColor: "#E2E8F0", padding: 4, borderRadius: 12, marginBottom: 28 },
   tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 9, borderWidth: 1, borderColor: "transparent" },
   tabText: { fontSize: 13, fontWeight: "600", color: "#64748B", marginLeft: 6 },
