@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -26,13 +26,39 @@ export default function RestockProductForm() {
   const [sellingPrice, setSellingPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Shoe Shop Variant States
-  const availableSizes = ["6", "7", "8", "9", "10", "11"];
-  const [selectedSize, setSelectedSize] = useState("8"); // Default focused shoe size
+  // --- Dynamic Footwear Category Engine additions ---
+  const [selectedCategory, setSelectedCategory] = useState("Men"); // "Men", "Women", "Children"
+
+  // Compute targeted ranges seamlessly based on localized regional standards
+  const availableSizes = useMemo(() => {
+    let start = 39, end = 45;
+    if (selectedCategory === "Women") { start = 35; end = 40; }
+    else if (selectedCategory === "Children") { start = 19; end = 29; }
+    
+    const sizesArray = [];
+    for (let i = start; i <= end; i++) {
+      sizesArray.push(String(i));
+    }
+    return sizesArray;
+  }, [selectedCategory]);
+
+  const [selectedSize, setSelectedSize] = useState("42"); // Default operational sizing focus
+
+  // Auto-correct active focus size whenever user transitions segment category track
+  useEffect(() => {
+    if (selectedCategory === "Men") setSelectedSize("42");
+    else if (selectedCategory === "Women") setSelectedSize("37");
+    else if (selectedCategory === "Children") setSelectedSize("24");
+  }, [selectedCategory]);
   
-  // Track quantities dynamically per size variant
+  // Track continuous stock quantities across all possible structural variations
   const [sizeQuantities, setSizeQuantities] = useState({
-    "6": "5", "7": "10", "8": "15", "9": "12", "10": "8", "11": "4"
+    // Men Matrix
+    "39": "2", "40": "2", "41": "2", "42": "2", "43": "2", "44": "2", "45": "2",
+    // Women Matrix
+    "35": "2", "36": "2", "37": "2", "38": "3", "39": "2", "40": "2",
+    // Children Matrix
+    "19": "2", "20": "2", "21": "3", "22": "2", "23": "1", "24": "2", "25": "2", "26": "2", "27": "2", "28": "2", "29": "2"
   });
 
   // Counter helper handlers for current active size focus
@@ -76,8 +102,8 @@ export default function RestockProductForm() {
       Alert.alert(
         "Inventory Logged", 
         formType === "new" 
-          ? `"${prodName}" has been added to your catalog grid with variant stock matrices.`
-          : `Size ${selectedSize} stock updated to ${targetedQty} pairs for SKU: ${prodCode.toUpperCase()}.`
+          ? `"${prodName}" (${selectedCategory}) has been added to your catalog grid with variant stock matrices.`
+          : `Size ${selectedSize} (${selectedCategory}) stock updated to ${targetedQty} pairs for SKU: ${prodCode.toUpperCase()}.`
       );
 
       // Reset form variables cleanly if fresh creation
@@ -87,7 +113,10 @@ export default function RestockProductForm() {
         setModelNumber("");
         setCostPrice("");
         setSellingPrice("");
-        setSizeQuantities({"6": "0", "7": "0", "8": "0", "9": "0", "10": "0", "11": "0"});
+        // Clean baseline reset across state boundaries
+        const cleanReset = { ...sizeQuantities };
+        Object.keys(cleanReset).forEach(key => cleanReset[key] = "0");
+        setSizeQuantities(cleanReset);
       }
     } catch (error) {
       Alert.alert("Operation Failed", "Could not synchronize the inbound shipment metrics.");
@@ -142,7 +171,7 @@ export default function RestockProductForm() {
               color={formType === "restock" ? "#10B981" : "#64748B"} 
             />
             <Text style={[styles.typeTabText, formType === "restock" ? styles.activeTypeTabText : null]}>
-              Restock Existing Sizes
+              Restock Existing
             </Text>
           </TouchableOpacity>
         </View>
@@ -163,8 +192,38 @@ export default function RestockProductForm() {
         {/* Form Container */}
         <View style={styles.cardForm}>
           
+          {/* NEW SECTION: PREMIUM FOOTWEAR CATEGORY TOGGLE SEGMENT PILL ROW */}
+          <Text style={styles.inputLabel}>Target Customer Segment</Text>
+          <View style={styles.categoryToggleTrack}>
+            {["Men", "Women", "Children"].map((category) => {
+              const isCatActive = selectedCategory === category;
+              let segmentIcon = "man-outline";
+              if (category === "Women") segmentIcon = "woman-outline";
+              if (category === "Children") segmentIcon = "balloon-outline";
+
+              return (
+                <TouchableOpacity
+                  key={category}
+                  activeOpacity={0.8}
+                  style={[styles.categorySegment, isCatActive && styles.categorySegmentActive]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Ionicons 
+                    name={segmentIcon} 
+                    size={14} 
+                    color={isCatActive ? "#10B981" : "#64748B"} 
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.categoryToggleText, isCatActive && styles.categoryToggleTextActive]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {/* PRODUCT CODE / BASE SKU (Needed for both types) */}
-          <Text style={styles.inputLabel}>Base SKU / Barcode <Text style={styles.requiredAsterisk}>*</Text></Text>
+          <Text style={styles.inputLabel}>Base SKU/ Model Number <Text style={styles.requiredAsterisk}>*</Text></Text>
           <View style={styles.inputFieldBox}>
             <Ionicons name="barcode-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
             <TextInput
@@ -206,8 +265,8 @@ export default function RestockProductForm() {
             </>
           )}
 
-          {/* DYNAMIC SIZE MATRIX CONTAINER (CRITICAL FOR SHOE SHOP) */}
-          <Text style={styles.inputLabel}>Select Variant Size (UK/US)</Text>
+          {/* DYNAMIC SIZE MATRIX CONTAINER */}
+          <Text style={styles.inputLabel}>Select Variant Size (EU Range)</Text>
           <View style={styles.sizeMatrixGrid}>
             {availableSizes.map((size) => {
               const isSelected = selectedSize === size;
@@ -226,7 +285,7 @@ export default function RestockProductForm() {
                     Size {size}
                   </Text>
                   <Text style={[styles.sizeStockIndicator, isSelected ? styles.activeSizeStockIndicator : null]}>
-                    ({sizeQuantities[size]} pairs)
+                    ({sizeQuantities[size] || 0} pairs)
                   </Text>
                 </TouchableOpacity>
               );
@@ -235,7 +294,7 @@ export default function RestockProductForm() {
 
           {/* QUANTITY COUNTER ADJUSTMENT FOR THE SELECTED SIZE */}
           <Text style={styles.inputLabel}>
-            Modify Batch Intake for <Text style={styles.focusedSizeLabel}>Size {selectedSize}</Text> <Text style={styles.requiredAsterisk}>*</Text>
+            Modify Batch Intake for <Text style={styles.focusedSizeLabel}>Size {selectedSize} ({selectedCategory})</Text> <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
           <View style={styles.counterRow}>
             <TouchableOpacity style={styles.counterBtn} onPress={() => adjustQuantity(-1)}>
@@ -245,7 +304,7 @@ export default function RestockProductForm() {
             <TextInput
               style={styles.counterInput}
               keyboardType="number-pad"
-              value={sizeQuantities[selectedSize]}
+              value={sizeQuantities[selectedSize] || "0"}
               onChangeText={handleManualQtyChange}
               textAlign="center"
             />
@@ -336,6 +395,13 @@ const styles = StyleSheet.create({
   formSectionTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
   infoSubtitle: { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 16 },
 
+  // Premium Segment Selector styling additions
+  categoryToggleTrack: { flexDirection: "row", backgroundColor: "#F1F5F9", borderRadius: 12, padding: 4, marginBottom: 20 },
+  categorySegment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, borderRadius: 9 },
+  categorySegmentActive: { backgroundColor: "#FFFFFF", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 2 },
+  categoryToggleText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  categoryToggleTextActive: { color: "#0F172A", fontWeight: "700" },
+
   // Input Field Box Controls
   cardForm: { backgroundColor: "#FFF", borderRadius: 16, borderStyle: "solid", borderWidth: 1, borderColor: "#E2E8F0", padding: 18, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
   inputLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 8 },
@@ -346,8 +412,8 @@ const styles = StyleSheet.create({
   textInput: { flex: 1, color: "#0F172A", fontSize: 14, height: "100%", fontWeight: "500" },
 
   // Shoe Size Grid Matrix Elements
-  sizeMatrixGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 18 },
-  sizeBubble: { width: "31%", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, paddingVertical: 10, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  sizeMatrixGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "flex-start", marginBottom: 18 },
+  sizeBubble: { width: "31.5%", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, paddingVertical: 10, alignItems: "center", justifyContent: "center", marginBottom: 2 },
   hasStockSizeBubble: { borderColor: "#CBD5E1", backgroundColor: "#F1F5F9" },
   activeSizeBubble: { backgroundColor: "#10B981", borderColor: "#10B981" },
   sizeText: { fontSize: 14, fontWeight: "700", color: "#1E293B" },

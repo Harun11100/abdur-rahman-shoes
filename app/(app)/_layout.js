@@ -28,7 +28,7 @@ export default function RootLayout({ children }) {
 const styles = StyleSheet.create({
   headerContainer: {
     height: 40, // Adjust this value or add padding if handling safe area constraints
-    backgroundColor: '#16A34A', // Change this hex value to your preferred branding color
+    backgroundColor: '#739afa', // Change this hex value to your preferred branding color
     justifyContent: 'center',
     alignItems: 'center',
   },

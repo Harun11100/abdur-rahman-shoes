@@ -9,9 +9,11 @@ import {
   StatusBar,
   TextInput,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 
 export default function NewAdminRegistration() {
   const router = useRouter();
@@ -22,15 +24,37 @@ export default function NewAdminRegistration() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [image, setImage] = useState(null);
 
   const [selectedRole, setSelectedRole] = useState("Manager"); // Default role setting
   const rolesList = ["Manager", "Supervisor", "Administrator"];
 
   // Toggle Visibility for sensitive fields
   const [isPasswordSecure, setIsPasswordSecure] = useState(true);
+
+  // Profile picture image picking processor
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "We need storage access permissions to upload your profile layout picture.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
   const handleCreateAccount = () => {
     // 1. Basic Validation Controls
-    if (!fullName || !email || !employeeId || !password || !confirmPassword){
+    if (!fullName || !email || !employeeId || !password || !confirmPassword) {
       Alert.alert("Missing Fields", "Please populate all terminal input spaces before submission.");
       return;
     }
@@ -47,6 +71,7 @@ export default function NewAdminRegistration() {
       Alert.alert("Mismatched Password", "The validation string confirmation field does not match.");
       return;
     }
+
     Alert.alert(
       "Provisioning Successful",
       `Profile identity configured for ${fullName}.\nRole: ${selectedRole}\nID: ${employeeId}`,
@@ -58,6 +83,7 @@ export default function NewAdminRegistration() {
       ]
     );
   };
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" />
@@ -86,6 +112,26 @@ export default function NewAdminRegistration() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* Section: Profile Image Picking Block */}
+        <Text style={styles.sectionHeadingTitle}>Profile Graphic</Text>
+        <View style={styles.avatarPickerCard}>
+          <TouchableOpacity style={styles.avatarPickerTarget} onPress={pickImage} activeOpacity={0.85}>
+            {image ? (
+              <Image source={{ uri: image }} style={styles.avatarPickerImage} />
+            ) : (
+              <View style={styles.avatarPickerFallbackContent}>
+                <Ionicons name="camera" size={26} color="#64748B" />
+                <Text style={styles.avatarPickerFallbackText}>Upload Portrait</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          {image && (
+            <TouchableOpacity style={styles.clearAvatarBtn} onPress={() => setImage(null)}>
+              <Text style={styles.clearAvatarBtnText}>Remove Image</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Section: Core Profile Information */}
         <Text style={styles.sectionHeadingTitle}>Identity & Workspace</Text>
         <View style={styles.formContainerCard}>
@@ -127,7 +173,35 @@ export default function NewAdminRegistration() {
         </View>
 
         {/* Section: Dynamic Clearance Role Selector Component */}
-
+        <Text style={styles.sectionHeadingTitle}>Clearance Level</Text>
+        <View style={styles.roleSelectionCard}>
+          <Text style={styles.roleCardInstructions}>
+            Select the access parameter package assigned to this security profile token.
+          </Text>
+          <View style={styles.roleChipsRow}>
+            {rolesList.map((roleItem) => {
+              const isSelected = selectedRole === roleItem;
+              return (
+                <TouchableOpacity
+                  key={roleItem}
+                  style={[
+                    styles.roleChipItem,
+                    isSelected && styles.roleChipItemSelected
+                  ]}
+                  onPress={() => setSelectedRole(roleItem)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.roleChipText,
+                    isSelected && styles.roleChipTextSelected
+                  ]}>
+                    {roleItem}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
 
         {/* Section: Secure Access Configuration */}
         <Text style={styles.sectionHeadingTitle}>Access Verification Keys</Text>
@@ -228,6 +302,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+  // Profile Image Setup Area Styles
+  avatarPickerCard: { backgroundColor: "#FFF", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", padding: 16, alignItems: "center", marginBottom: 24 },
+  avatarPickerTarget: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F8FAFC", borderStyle: "dashed", borderWidth: 1.5, borderColor: "#CBD5E1", justifyContent: "center", alignItems: "center", overflow: "hidden" },
+  avatarPickerFallbackContent: { alignItems: "center", justifyContent: "center" },
+  avatarPickerFallbackText: { fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 4 },
+  avatarPickerImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  clearAvatarBtn: { marginTop: 10 },
+  clearAvatarBtnText: { fontSize: 13, color: "#EF4444", fontWeight: "600" },
+
   // Consistent Modular Containers
   sectionHeadingTitle: { fontSize: 13, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10, marginLeft: 4 },
   formContainerCard: { backgroundColor: "#FFF", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 16, overflow: "hidden", marginBottom: 24 },
@@ -240,8 +323,8 @@ const styles = StyleSheet.create({
   // Role Selection Element Block Card
   roleSelectionCard: { backgroundColor: "#FFF", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", padding: 16, marginBottom: 24 },
   roleCardInstructions: { fontSize: 12, color: "#64748B", marginBottom: 14, lineHeight: 16 },
-  roleChipsRow: { flexDirection: "row", justifyContent: "space-between" },
-  roleChipItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, marginHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+  roleChipsRow: { flexDirection: "row", gap: 8 },
+  roleChipItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
   roleChipItemSelected: { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" },
   roleChipText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
   roleChipTextSelected: { color: "#3B82F6", fontWeight: "700" },

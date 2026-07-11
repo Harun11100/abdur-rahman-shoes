@@ -8,9 +8,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 
 export default function ManageManagers() {
   const router = useRouter();
@@ -19,14 +21,45 @@ export default function ManageManagers() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [image, setImage] = useState(null);
   const [secureText, setSecureText] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Mock initial list of managers currently assigned to the system
   const [managers, setManagers] = useState([
-    { id: "1", name: "Rahat Khan", email: "rahat@company.com", status: "Active" },
-    { id: "2", name: "Anika Ahmed", email: "anika@company.com", status: "Active" },
+    { id: "1", name: "Rahat Khan", email: "rahat@company.com", status: "Active", image: null },
+    { id: "2", name: "Anika Ahmed", email: "anika@company.com", status: "Active", image: null },
   ]);
+
+  // Handle image selection from device gallery
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "We need camera roll access permissions to upload a profile avatar picture.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  // Helper method to safely generate clean initials string
+  const getInitials = (fullName) => {
+    if (!fullName) return "M";
+    return fullName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
 
   const handleCreateManager = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
@@ -45,6 +78,7 @@ export default function ManageManagers() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         status: "Active",
+        image: image, // Store chosen local path
       };
 
       setManagers([newManager, ...managers]);
@@ -54,6 +88,7 @@ export default function ManageManagers() {
       setName("");
       setEmail("");
       setPassword("");
+      setImage(null);
     } catch (error) {
       Alert.alert("Error", "Could not create manager profile.");
     } finally {
@@ -104,6 +139,26 @@ export default function ManageManagers() {
 
       {/* Registration Form Box */}
       <View style={styles.formContainer}>
+        
+        {/* Profile Image Picker Input Target Component */}
+        <View style={styles.imagePickerCenterBlock}>
+          <TouchableOpacity style={styles.imagePickerFrame} onPress={pickImage} activeOpacity={0.85}>
+            {image ? (
+              <Image source={{ uri: image }} style={styles.selectedAvatarPreview} />
+            ) : (
+              <View style={styles.avatarPlaceholderWrapper}>
+                <Ionicons name="camera-outline" size={24} color="#64748B" />
+                <Text style={styles.avatarPlaceholderText}>Add Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          {image && (
+            <TouchableOpacity style={styles.removeImageBadge} onPress={() => setImage(null)}>
+              <Text style={styles.removeImageText}>Clear Photo</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <Text style={styles.inputLabel}>Full Name</Text>
         <View style={styles.inputWrapper}>
           <Ionicons name="person-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
@@ -180,9 +235,13 @@ export default function ManageManagers() {
         managers.map((item) => (
           <View key={item.id} style={styles.managerCard}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarText}>
-                {item.name.split(" ").map(n => n[0]).join("").toUpperCase()}
-              </Text>
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.listAvatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {getInitials(item.name)}
+                </Text>
+              )}
             </View>
             
             <View style={styles.managerInfo}>
@@ -223,6 +282,16 @@ const styles = StyleSheet.create({
   
   // Form Configuration
   formContainer: { backgroundColor: "#FFF", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 28 },
+  
+  // Profile Image Input Styles
+  imagePickerCenterBlock: { alignItems: "center", marginBottom: 20, marginTop: 4 },
+  imagePickerFrame: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0", borderStyle: "dashed", overflow: "hidden", justifyContent: "center", alignItems: "center" },
+  avatarPlaceholderWrapper: { alignItems: "center", justifyContent: "center" },
+  avatarPlaceholderText: { fontSize: 11, fontWeight: "600", color: "#64748B", marginTop: 4 },
+  selectedAvatarPreview: { width: "100%", height: "100%", resizeMode: "cover" },
+  removeImageBadge: { marginTop: 6, paddingVertical: 2, paddingHorizontal: 8 },
+  removeImageText: { fontSize: 12, color: "#EF4444", fontWeight: "600" },
+
   inputLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 6 },
   inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, height: 48, marginBottom: 16, paddingHorizontal: 14 },
   inputIcon: { marginRight: 10 },
@@ -234,8 +303,9 @@ const styles = StyleSheet.create({
   // List Layouts
   sectionTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A", marginBottom: 14 },
   managerCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", padding: 14, borderRadius: 14, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 12 },
-  avatarContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
+  avatarContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" },
   avatarText: { fontSize: 14, fontWeight: "700", color: "#475569" },
+  listAvatarImage: { width: "100%", height: "100%", resizeMode: "cover" },
   managerInfo: { flex: 1, marginLeft: 12 },
   managerName: { fontSize: 15, fontWeight: "600", color: "#0F172A" },
   managerEmail: { fontSize: 12, color: "#64748B", marginTop: 1 },

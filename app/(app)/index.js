@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -27,7 +28,6 @@ const PRODUCT_DATABASE = [
       { size: "42", quantity: 14 },
       { size: "43", quantity: 3 }
     ],
-
   },
   {
     model: "AD500122",
@@ -63,11 +63,11 @@ export default function Dashboard() {
   // Track total items dynamically so sales updates affect aggregate state
   const [totalStockCount, setTotalStockCount] = useState(1235);
 
-const [recentSales, setRecentSales] = useState([
-  { id: "INV-2026-003", items: "Nike Air Max Sports Shoes (Size 42) x2, Cotton Socks x1", amount: "৳3,400", time: "10 mins ago", status: "Paid" },
-  { id: "INV-2026-002", items: "Classic Leather Chelsea Boots (Size 41) x1", amount: "৳4,500", time: "45 mins ago", status: "Paid" },
-  { id: "INV-2026-001", items: "Breathable Running Sneakers (Size 43) x1", amount: "৳2,100", time: "2 hours ago", status: "Pending" },
-]);
+  const [recentSales, setRecentSales] = useState([
+    { id: "INV-2026-003", items: "Nike Air Max Sports Shoes (Size 42) x2, Cotton Socks x1", amount: "৳3,400", time: "10 mins ago", status: "Paid" },
+    { id: "INV-2026-002", items: "Classic Leather Chelsea Boots (Size 41) x1", amount: "৳4,500", time: "45 mins ago", status: "Paid" },
+    { id: "INV-2026-001", items: "Breathable Running Sneakers (Size 43) x1", amount: "৳2,100", time: "2 hours ago", status: "Pending" },
+  ]);
 
   // Hook to handle synchronization when returning from ManagerActions
   useEffect(() => {
@@ -89,7 +89,6 @@ const [recentSales, setRecentSales] = useState([
         if (params.updatedModelSku) {
           const match = PRODUCT_DATABASE.find(p => p.model === params.updatedModelSku);
           if (match) {
-            // Note: In production prototypes, write these items into a true local state collection array!
             console.log(`Model ${params.updatedModelSku} stock updated to ${params.updatedStockQty}`);
           }
         }
@@ -121,9 +120,6 @@ const [recentSales, setRecentSales] = useState([
     setSearchQuery(product.model);
     setSuggestions([]);
 
-    // Sum up sizes to pass aggregate count to actions workspace
-    const totalAvailable = product.sizes.reduce((acc, curr) => acc + curr.quantity, 0);
-
     router.push({
       pathname: "/manager/actions",
       params: {
@@ -154,10 +150,10 @@ const [recentSales, setRecentSales] = useState([
   const stats = [
     { id: 1, title: "Products Available", value: 248, icon: "cube-outline" , color: "#3B82F6", bgColor: "#EFF6FF" },
     { id: 2, title: "In Stock Total", value: totalStockCount, icon: "archive-outline" , color: "#10B981", bgColor: "#ECFDF5" },
-    ...(userRole === "admin" ? [{ id: 3, title: "Today's Revenue", value: "৳12,450", icon: "cash-outline" , color: "#F59E0B", bgColor: "#FEF3C7" },
+    ...(userRole === "admin" ? [
+      { id: 3, title: "Today's Revenue", value: "৳12,450", icon: "cash-outline" , color: "#F59E0B", bgColor: "#FEF3C7" },
       { id: 4, title: "Low Stock Items", value: 8, icon: "warning-outline" , color: "#EF4444", bgColor: "#FEF2F2" }
     ] : []),
-    ,
   ];
 
   const quickActions = [
@@ -171,52 +167,68 @@ const [recentSales, setRecentSales] = useState([
 
   return (
     <View style={styles.container}>
+      {/* Absolute Header Background Elements Outside the Primary Scroller Padding */}
+      <View style={styles.coverContainer}>
+        {/* Replace source with your actual image URI or local asset requirement */}
+        <Image 
+          source={{ uri: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop" }} 
+          style={styles.coverPhoto} 
+        />
+        <View style={styles.coverOverlay} />
+      </View>
+
       <ScrollView 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header Profile Section */}
-        <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <Text style={styles.greeting}>👋 Good Morning,</Text>
-            <Text style={styles.name}>{user?.name || "User"}</Text>
-            <View style={[styles.roleBadge, { backgroundColor: userRole === "admin" ? "#FEF2F2" : "#F0FDF4" }]}>
-              <Text style={[styles.roleBadgeText, { color: userRole === "admin" ? "#EF4444" : "#16A34A" }]}>
-                {userRole.toUpperCase()}
-              </Text>
+        {/* Header Profile Section with Overlapping Visual Elements */}
+        <View style={styles.headerProfileWrapper}>
+          <View style={styles.profilePlacementRow}>
+            {/* Profile Frame Container */}
+            <View style={styles.profilePhotoContainer}>
+              {/* Replace source with your actual user image URI */}
+              <Image 
+                source={{ uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop" }} 
+                style={styles.profileImage} 
+              />
             </View>
+
+      
+          </View>
+
+          {/* Quick Floating Settings/Logout Row */}
+         <View style={styles.headerActions}>
+            {userRole === "admin" && (
+              <TouchableOpacity 
+                style={styles.iconButton}
+                activeOpacity={0.7}
+                onPress={() => router.push("/profile/settings")}
+              >
+                <Ionicons name="settings-outline" size={19} color="#475569" />
+              </TouchableOpacity>
+            )}
+              
+            <TouchableOpacity 
+              style={[styles.iconButton, styles.logoutIconButton]}
+              activeOpacity={0.7}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={19} color="#EF4444" />
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.headerActions}>
-
-  <TouchableOpacity 
-    style={styles.iconButton}
-    activeOpacity={0.7}
-    onPress={() => router.push("/profile/settings")}
-  >
-    <Ionicons 
-      name="settings-outline" 
-      size={21} 
-      color="#475569" 
-    />
-  </TouchableOpacity>
-
-
-  <TouchableOpacity 
-    style={[styles.iconButton, styles.logoutIconButton]}
-    activeOpacity={0.7}
-    onPress={handleLogout}
-  >
-    <Ionicons 
-      name="log-out-outline" 
-      size={21} 
-      color="#EF4444" 
-    />
-  </TouchableOpacity>
-
-</View>
         </View>
+      {/* User Meta Information Stack */}
+            <View style={styles.userInfoBlock}>
+              <Text style={styles.name}>{user?.name || "User"}</Text>
+              <View style={[styles.roleBadge, { backgroundColor: userRole === "admin" ? "#FEF2F2" : "#F0FDF4" }]}>
+                <Text style={[styles.roleBadgeText, { color: userRole === "admin" ? "#EF4444" : "#16A34A" }]}>
+                  {userRole.toUpperCase()}
+                </Text>
+              </View>
+         </View>
+
 
         {/* Search Input Container Area */}
         <View style={styles.searchWrapperBlock}>
@@ -262,28 +274,25 @@ const [recentSales, setRecentSales] = useState([
         </View>
 
         {/* Grid Stats */}
-      <View style={styles.grid}>
-  {stats.map((item) => (
-    <View 
-      key={item.id} 
-      style={[
-        styles.card, 
-        stats.length === 3 && item.id === 4 ? styles.fullWidthCard : null
-      ]}
-    >
-      {/* Top Header Row within the card */}
-      <View style={styles.cardHeader}>
-        <View style={[styles.iconContainer, { backgroundColor: item.bgColor }]}>
-          <Ionicons name={item.icon} size={16} color={item.color} />
+        <View style={styles.grid}>
+          {stats.map((item) => (
+            <View 
+              key={item.id} 
+              style={[
+                styles.card, 
+                stats.length === 3 && item.id === 4 ? styles.fullWidthCard : null
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconContainer, { backgroundColor: item.bgColor }]}>
+                  <Ionicons name={item.icon} size={16} color={item.color} />
+                </View>
+                <Text style={styles.cardValue}>{item.value}</Text>
+              </View>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+            </View>
+          ))}
         </View>
-        <Text style={styles.cardValue}>{item.value}</Text>
-      </View>
-    
-      {/* Small Clean Label */}
-      <Text style={styles.cardTitle}>{item.title}</Text>
-    </View>
-  ))}
-</View>
 
         {/* Dynamic Actions Grid Wrapper */}
         <Text style={styles.sectionTitle}>Authorized Tasks</Text>
@@ -342,48 +351,94 @@ const [recentSales, setRecentSales] = useState([
   );
 }
 
-// Keeping your original style definitions un-mutated
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  contentContainer: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginTop: 10, marginBottom: 20 },
-  headerActions: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 10,
-},
-iconButton: {
-  width: 40,
-  height: 40,
-  borderRadius: 14,
-  backgroundColor: "#FFFFFF",
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: "#E2E8F0",
-
-  // subtle shadow
-  shadowColor: "#000",
-  shadowOffset: {
-    width: 0,
-    height: 2,
+  
+  // New Cover & Profile Picture Styles
+  coverContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    backgroundColor: "#1E293B",
   },
-  shadowOpacity: 0.05,
-  shadowRadius: 4,
-  elevation: 2,
-},
+  coverPhoto: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.25)", // Subtle dark gradient sheet overlay
+  },
+  headerProfileWrapper: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 80, // Displaces view downwards to perfectly align overlap break
+    marginBottom: 25,
+  },
+  profilePlacementRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flex: 1,
+  },
+  profilePhotoContainer: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    padding: 3,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 19,
+  },
+  userInfoBlock: {
+    marginLeft: 4,
+    flex: 1,
+    marginBottom: 12,
+  },
 
-
-logoutIconButton: {
-  backgroundColor: "#FFF7F7",
-  borderColor: "#FECACA",
-},
-  userInfo: { flex: 1 },
-  greeting: { fontSize: 14, fontWeight: "500", color: "#64748B" },
-  name: { fontSize: 26, fontWeight: "700", color: "#0F172A", marginTop: 2 },
-  roleBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 6 },
-  roleBadgeText: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
-  logoutButton: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: 'center', borderWidth: 1, borderColor: "#FEE2E2" },
+  contentContainer: { padding: 20, paddingBottom: 40 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  logoutIconButton: {
+    backgroundColor: "#FFF7F7",
+    borderColor: "#FECACA",
+  },
+  greeting: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  name: { fontSize: 22, fontWeight: "700", color: "#0F172A", marginTop: 1 },
+  roleBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, marginTop: 4 },
+  roleBadgeText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
   searchWrapperBlock: { zIndex: 50, marginBottom: 24 }, 
   searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 14, height: 48, paddingHorizontal: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2, elevation: 1 },
   searchIcon: { marginRight: 10 },
@@ -394,46 +449,25 @@ logoutIconButton: {
   suggestionIconWrapper: { width: 28, height: 28, borderRadius: 6, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", marginRight: 10 },
   suggestionModelText: { fontSize: 13, fontWeight: "700", color: "#1E293B" },
   suggestionNameText: { fontSize: 11, color: "#64748B", marginTop: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap:10,marginBottom: 24},
+  grid: { flexDirection: "row", flexWrap: "wrap", gap:10, marginBottom: 24},
   card: {
-    // Math calculation for a perfect 2-column small grid with gap accounted for
     width: (width - 52) / 2, 
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0', // Crisp, thin divider lines
-    
-    // Smooth micro shadow for premium elevation
+    borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 1,
   },
-  fullWidthCard: {
-    width: '100%',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  iconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 9, // Slightly squared-rounded premium look
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A', // Slate-900 (ultra premium dark text)
-    letterSpacing: -0.3,
-  },
+  fullWidthCard: { width: '100%' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  iconContainer: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  cardValue: { fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3 },
   cardTitle: { fontSize: 13, color: "#64748B", marginTop: 4, fontWeight: "500" },
   sectionTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A", marginVertical: 20 },
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 12 },
