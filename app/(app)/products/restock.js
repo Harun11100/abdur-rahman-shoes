@@ -10,30 +10,63 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { uploadImages } from "../../upload/upload";
+import * as ImagePicker from "expo-image-picker";
 
 export default function RestockProductForm() {
   const router = useRouter();
   
   // Form State Engines
-  const [formType, setFormType] = useState("new"); // "new" (Fresh Catalog Addition) or "restock" (Existing Item Inbound)
+  const [formType, setFormType] = useState("new"); // "new" or "restock"
   const [prodName, setProdName] = useState("");
   const [prodCode, setProdCode] = useState("");
   const [modelNumber, setModelNumber] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // --- Dynamic Footwear Category Engine additions ---
+  const [productImages, setProductImages] = useState([]); // Correct flat array initialization
+  
+  // Dynamic Footwear Category Engine additions
   const [selectedCategory, setSelectedCategory] = useState("Men"); // "Men", "Women", "Children"
+
+  const pickImages = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission Required", "Please grant permission to access the media library.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit:3,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        // Fixed: Use correct setProductImages and slice against the combined flat array
+        setProductImages((prev) => [...prev, ...result.assets].slice(0, 3));
+      }
+    } catch (error) {
+      Alert.alert("ত্রুটি", "ছবি নির্বাচন করা যায়নি");
+    }
+  };
+
+  const removeImage = (index) => {
+    // Fixed: Use correct setProductImages filtering the array directly
+    setProductImages((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Compute targeted ranges seamlessly based on localized regional standards
   const availableSizes = useMemo(() => {
     let start = 39, end = 45;
-    if (selectedCategory === "Women") { start = 35; end = 40; }
-    else if (selectedCategory === "Children") { start = 19; end = 29; }
+    if (selectedCategory === "Women") { start = 36; end = 45; }
+    else if (selectedCategory === "Children") { start = 15; end = 40; }
     
     const sizesArray = [];
     for (let i = start; i <= end; i++) {
@@ -42,26 +75,24 @@ export default function RestockProductForm() {
     return sizesArray;
   }, [selectedCategory]);
 
-  const [selectedSize, setSelectedSize] = useState("42"); // Default operational sizing focus
+  const [selectedSize, setSelectedSize] = useState("39"); // Default operational sizing focus
 
   // Auto-correct active focus size whenever user transitions segment category track
   useEffect(() => {
-    if (selectedCategory === "Men") setSelectedSize("42");
-    else if (selectedCategory === "Women") setSelectedSize("37");
-    else if (selectedCategory === "Children") setSelectedSize("24");
+    if (selectedCategory === "Men") setSelectedSize("39");
+    else if (selectedCategory === "Women") setSelectedSize("36");
+    else if (selectedCategory === "Children") setSelectedSize("15");
   }, [selectedCategory]);
   
   // Track continuous stock quantities across all possible structural variations
   const [sizeQuantities, setSizeQuantities] = useState({
-    // Men Matrix
-    "39": "2", "40": "2", "41": "2", "42": "2", "43": "2", "44": "2", "45": "2",
-    // Women Matrix
-    "35": "2", "36": "2", "37": "2", "38": "3", "39": "2", "40": "2",
-    // Children Matrix
-    "19": "2", "20": "2", "21": "3", "22": "2", "23": "1", "24": "2", "25": "2", "26": "2", "27": "2", "28": "2", "29": "2"
+    "15":"0","16":"0","17":"0", "18": "0", "19": "0", "20": "0", "21": "0",
+    "22": "0", "23": "0", "24": "0", "25": "0", "26": "0", "27": "0", "28": "0",
+    "29": "0","30": "0","31": "0", "32": "0", "33": "0", "34": "0", "35": "0",
+    "35": "0", "36": "0", "37": "0", "38": "0", "39": "0", "40": "0",
+    "41": "0", "42": "0", "43": "0", "44": "0", "45": "0", 
   });
 
-  // Counter helper handlers for current active size focus
   const adjustQuantity = (amount) => {
     const current = parseInt(sizeQuantities[selectedSize], 10) || 0;
     const computed = current + amount;
@@ -76,12 +107,12 @@ export default function RestockProductForm() {
   const handleManualQtyChange = (text) => {
     setSizeQuantities({
       ...sizeQuantities,
-      [selectedSize]: text.replace(/[^0-9]/g, ""), // Only numeric inputs
+      [selectedSize]: text.replace(/[^0-9]/g, ""),
     });
   };
 
   const handleFormSubmit = async () => {
-    // Structural Field Validations
+    // Validations
     if (formType === "new" && (!prodName.trim() || !prodCode.trim() || !sellingPrice.trim())) {
       Alert.alert("Required Fields Missing", "Please provide a Shoe Model Name, Unique Code/SKU, and Retail Selling Price.");
       return;
@@ -90,36 +121,84 @@ export default function RestockProductForm() {
       Alert.alert("Required Fields Missing", "Please scan or enter the target Shoe Base SKU.");
       return;
     }
-
-    setIsSubmitting(true);
+    // Fixed: Corrected property access on flat productImages array
+    if (productImages.length === 0) {
+      return Alert.alert("Image Required", "Please add at least one image.");
+    }
 
     try {
-      // Simulating API catalog execution delays
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      setIsSubmitting(true);
+      const imageFormData = new FormData();
       
-      const targetedQty = sizeQuantities[selectedSize];
-      
+      // Fixed: Append items directly from productImages state
+      productImages.forEach((img) => {
+        imageFormData.append("images", {
+          uri: img.uri,
+          name: img.fileName || `product-${Date.now()}.jpg`,
+          type: img.mimeType || "image/jpeg",
+        });
+      });
+
+      // Fixed: Avoid variable shadow collisions by using remoteUrls instead of uploadedImages
+      const remoteUrls = await uploadImages(imageFormData);
+      if (!remoteUrls || remoteUrls.length === 0) {
+        throw new Error("Image upload failed");
+      }
+
+      const payload = {
+        formType,
+        prodCode: prodCode.trim().toUpperCase(),
+        prodName: prodName.trim(),
+        modelNumber: modelNumber.trim(),
+        selectedCategory,
+        selectedSize,
+        sizeQuantities: formType === "new" 
+          ? sizeQuantities 
+          : { [selectedSize]: sizeQuantities[selectedSize] },
+        costPrice: costPrice || "0",
+        sellingPrice: sellingPrice,
+        images: remoteUrls, 
+      };
+
+      const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/product"; 
+
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || "Server rejected transaction logic.");
+      }
+
       Alert.alert(
-        "Inventory Logged", 
+        "Inventory Synced", 
         formType === "new" 
-          ? `"${prodName}" (${selectedCategory}) has been added to your catalog grid with variant stock matrices.`
-          : `Size ${selectedSize} (${selectedCategory}) stock updated to ${targetedQty} pairs for SKU: ${prodCode.toUpperCase()}.`
+          ? `"${prodName}" has been initialized into your digital ledger catalogs.`
+          : `Size ${selectedSize} inventory successfully stepped up for SKU: ${prodCode.toUpperCase()}.`
       );
 
-      // Reset form variables cleanly if fresh creation
       if (formType === "new") {
         setProdName("");
         setProdCode("");
         setModelNumber("");
         setCostPrice("");
         setSellingPrice("");
-        // Clean baseline reset across state boundaries
+        setProductImages([]); // Clean up preview images on success
+        
         const cleanReset = { ...sizeQuantities };
         Object.keys(cleanReset).forEach(key => cleanReset[key] = "0");
         setSizeQuantities(cleanReset);
       }
+
     } catch (error) {
-      Alert.alert("Operation Failed", "Could not synchronize the inbound shipment metrics.");
+      console.error("Network synchronization fault:", error);
+      Alert.alert("Sync Operation Failed", error.message || "Could not reach database network relay nodes.");
     } finally {
       setIsSubmitting(false);
     }
@@ -145,7 +224,9 @@ export default function RestockProductForm() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Dynamic Entry Type Selector Tabs */}
+        
+
+        {/* Entry Type Selector Tabs */}
         <View style={styles.typeSelectorRow}>
           <TouchableOpacity
             style={[styles.typeTab, formType === "new" ? styles.activeTypeTab : null]}
@@ -191,8 +272,6 @@ export default function RestockProductForm() {
 
         {/* Form Container */}
         <View style={styles.cardForm}>
-          
-          {/* NEW SECTION: PREMIUM FOOTWEAR CATEGORY TOGGLE SEGMENT PILL ROW */}
           <Text style={styles.inputLabel}>Target Customer Segment</Text>
           <View style={styles.categoryToggleTrack}>
             {["Men", "Women", "Children"].map((category) => {
@@ -221,8 +300,9 @@ export default function RestockProductForm() {
               );
             })}
           </View>
+    
 
-          {/* PRODUCT CODE / BASE SKU (Needed for both types) */}
+          {/* PRODUCT CODE / BASE SKU */}
           <Text style={styles.inputLabel}>Base SKU/ Model Number <Text style={styles.requiredAsterisk}>*</Text></Text>
           <View style={styles.inputFieldBox}>
             <Ionicons name="barcode-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
@@ -239,6 +319,27 @@ export default function RestockProductForm() {
           {/* DYNAMIC FIELD SECTIONS FOR NEW PRODUCTS ONLY */}
           {formType === "new" && (
             <>
+                  <Text style={styles.sectionLabel}>Product Media Gallery</Text>
+            <View style={styles.imageGrid}>
+              <TouchableOpacity style={styles.addImgBtn} onPress={pickImages}>
+                <View style={styles.uploadIconCircle}>
+                  <Feather name="camera" size={20} color="#059669" />
+                </View>
+                {/* Fixed: Access property directly via productImages length */}
+                <Text style={styles.addImgText}>{productImages.length}/3 Upload</Text>
+              </TouchableOpacity>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewScroll}>
+                {productImages.map((img, index) => (
+                  <View key={index} style={styles.imgWrapper}>
+                    <Image source={{ uri: img.uri }} style={styles.previewImg} />
+                    <TouchableOpacity style={styles.removeBadge} onPress={() => removeImage(index)}>
+                      <Feather name="x" size={12} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
               <Text style={styles.inputLabel}>Shoe Model Name <Text style={styles.requiredAsterisk}>*</Text></Text>
               <View style={styles.inputFieldBox}>
                 <Ionicons name="cube-outline" size={18} color="#94A3B8" style={styles.inputIcon} />
@@ -292,7 +393,7 @@ export default function RestockProductForm() {
             })}
           </View>
 
-          {/* QUANTITY COUNTER ADJUSTMENT FOR THE SELECTED SIZE */}
+          {/* QUANTITY COUNTER ADJUSTMENT */}
           <Text style={styles.inputLabel}>
             Modify Batch Intake for <Text style={styles.focusedSizeLabel}>Size {selectedSize} ({selectedCategory})</Text> <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
@@ -349,7 +450,7 @@ export default function RestockProductForm() {
             </View>
           )}
 
-          {/* SUBMIT BUTTON TRIGGER CONTAINER */}
+          {/* SUBMIT BUTTON */}
           <TouchableOpacity
             style={[styles.submitActionBtn, isSubmitting ? styles.disabledBtn : null]}
             onPress={handleFormSubmit}
@@ -367,7 +468,6 @@ export default function RestockProductForm() {
               </>
             )}
           </TouchableOpacity>
-
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -377,32 +477,22 @@ export default function RestockProductForm() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   contentContainer: { padding: 20, paddingBottom: 60 },
-
-  // Navigation Header
   navHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, marginBottom: 20 },
   backButton: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
   navTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-
-  // Operation Tab Pickers
   typeSelectorRow: { flexDirection: "row", backgroundColor: "#F1F5F9", borderRadius: 10, padding: 4, marginBottom: 24 },
   typeTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 8 },
   activeTypeTab: { backgroundColor: "#FFF", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 1, elevation: 1 },
   typeTabText: { fontSize: 13, color: "#64748B", fontWeight: "600", marginLeft: 6 },
   activeTypeTabText: { color: "#0F172A", fontWeight: "700" },
-
-  // Information Context Line
   infoSection: { marginBottom: 18 },
   formSectionTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
   infoSubtitle: { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 16 },
-
-  // Premium Segment Selector styling additions
   categoryToggleTrack: { flexDirection: "row", backgroundColor: "#F1F5F9", borderRadius: 12, padding: 4, marginBottom: 20 },
   categorySegment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, borderRadius: 9 },
   categorySegmentActive: { backgroundColor: "#FFFFFF", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 2 },
   categoryToggleText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
   categoryToggleTextActive: { color: "#0F172A", fontWeight: "700" },
-
-  // Input Field Box Controls
   cardForm: { backgroundColor: "#FFF", borderRadius: 16, borderStyle: "solid", borderWidth: 1, borderColor: "#E2E8F0", padding: 18, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
   inputLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 8 },
   requiredAsterisk: { color: "#EF4444" },
@@ -410,8 +500,6 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 8 },
   currencySymbolPrefix: { fontSize: 15, fontWeight: "700", color: "#64748B", marginRight: 8 },
   textInput: { flex: 1, color: "#0F172A", fontSize: 14, height: "100%", fontWeight: "500" },
-
-  // Shoe Size Grid Matrix Elements
   sizeMatrixGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "flex-start", marginBottom: 18 },
   sizeBubble: { width: "31.5%", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, paddingVertical: 10, alignItems: "center", justifyContent: "center", marginBottom: 2 },
   hasStockSizeBubble: { borderColor: "#CBD5E1", backgroundColor: "#F1F5F9" },
@@ -421,17 +509,22 @@ const styles = StyleSheet.create({
   sizeStockIndicator: { fontSize: 10, color: "#64748B", marginTop: 2 },
   activeSizeStockIndicator: { color: "#E6F4EA", fontWeight: "500" },
   focusedSizeLabel: { color: "#10B981", fontWeight: "700" },
-
-  // Pricing Layout Grid Split Row
   pricingGridRow: { flexDirection: "row", justifyContent: "space-between" },
-
-  // Advanced Quantity Counter Components 
   counterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, height: 48, paddingHorizontal: 6, marginBottom: 20 },
   counterBtn: { width: 38, height: 38, borderRadius: 8, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 1, elevation: 1 },
   counterInput: { flex: 1, fontSize: 16, fontWeight: "700", color: "#0F172A", height: "100%" },
-
-  // Submission Modules
   submitActionBtn: { height: 48, backgroundColor: "#10B981", borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 8, shadowColor: "#10B981", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
   disabledBtn: { opacity: 0.6 },
   submitActionBtnText: { color: "#FFF", fontSize: 15, fontWeight: "600" },
+  
+  // Appended missing structural layout styles to secure UI presentation:
+  sectionLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 8 },
+  imageGrid: { flexDirection: "column", marginBottom: 16 },
+  addImgBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderStyle: "dashed", borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 12, padding: 12, marginBottom: 8 },
+  uploadIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#E6F4EA", alignItems: "center", justifyContent: "center", marginRight: 12 },
+  addImgText: { fontSize: 13, color: "#059669", fontWeight: "600" },
+  previewScroll: { flexDirection: "row" },
+  imgWrapper: { position: "relative", marginRight: 10,marginTop: 6 },
+  previewImg: { width: 70, height: 70, borderRadius: 8 },
+  removeBadge: { position: "absolute", top: -4, right: -4, backgroundColor: "#EF4444", width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" }
 });

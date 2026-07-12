@@ -35,19 +35,49 @@ export default function Login() {
 
   const handleLogin = async () => {
     setError("");
-    if (!email || !password) {
+    
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setError("Please fill in all security configuration fields.");
       return;
     }
 
+    // Replace this with your actual local or production server address string
+    const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/login"; 
+
     try {
-      await login(email, password, role);
+      // 1. Fire the network request payload to the backend router route
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: cleanPassword,
+          role: role,
+        }),
+      });
+
+      const result = await response.json();
+
+      // 2. Check if the server rejected the authentication parameters
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || "Invalid credentials. Please verify data and try again.");
+      }
+
+      // 3. Update your Zustand/Auth store layout using the returned database records
+      // Pass the returned user data objects down into your save state hook logic
+      await login(result.data); 
+      
+      // 4. Redirect onto the secured app routing directory structure
       router.replace("/(app)"); 
     } catch (err) {
-      setError("Invalid credentials. Please verify data and try again.");
+      setError(err.message || "An unexpected error occurred. Please try again.");
     }
   };
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}

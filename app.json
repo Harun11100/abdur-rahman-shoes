@@ -46,6 +46,7 @@
       "reactCompiler": true
     },
     "extra": {
+      "API_URL": "https://abdur-rahman-shoes-web-app.vercel.app/",
       "router": {},
       "eas": {
         "projectId": "e48be3fc-73dc-4513-844d-6da392023262"

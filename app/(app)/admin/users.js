@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { uploadImages } from "../../upload/upload";
 
 export default function ManageManagers() {
   const router = useRouter();
@@ -21,11 +22,11 @@ export default function ManageManagers() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState(null); // Stores a single string URI or null
   const [secureText, setSecureText] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock initial list of managers currently assigned to the system
+  // Initial list of managers assigned to the system
   const [managers, setManagers] = useState([
     { id: "1", name: "Rahat Khan", email: "rahat@company.com", status: "Active", image: null },
     { id: "2", name: "Anika Ahmed", email: "anika@company.com", status: "Active", image: null },
@@ -56,41 +57,93 @@ export default function ManageManagers() {
     if (!fullName) return "M";
     return fullName
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase();
   };
 
   const handleCreateManager = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanName || !cleanEmail || !cleanPassword) {
       Alert.alert("Missing Details", "Please fill out all operational fields.");
       return;
     }
 
     setIsSubmitting(true);
+    const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/managerRegister"; 
 
     try {
-      // Simulate API registration delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      let remoteUrl = null;
 
-      const newManager = {
-        id: String(managers.length + 1),
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        status: "Active",
-        image: image, // Store chosen local path
+      // Fixed: Only upload if an image actually exists, and handle it as a single file instead of an array loop
+      if (image) {
+        const imageFormData = new FormData();
+        
+        // Since React Native's FormData requires an object structure for files:
+        imageFormData.append("images", {
+          uri: image,
+          name: `manager-${Date.now()}.jpg`,
+          type: "image/jpeg",
+        });
+
+        const remoteUrls = await uploadImages(imageFormData);
+        if (!remoteUrls || remoteUrls.length === 0) {
+          throw new Error("Image upload failed");
+        }
+        remoteUrl = remoteUrls[0];
+      }
+      
+      // 1. Prepare payload with static variables
+      const payload = {
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPassword,
+        image: remoteUrl, // Contains either the remote URL string or null
       };
 
-      setManagers([newManager, ...managers]);
-      Alert.alert("Success", `Account for ${name} has been authorized.`);
+      console.log("Payload for manager creation:", payload);
+
+      // 2. Execute network request
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      // // 3. Verify server response state
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || "The register system rejected this request.");
+      }
+
+      // 4. Update the local UI state array
+      const confirmedManager = {
+        id: result.data?.id || result.id || String(Date.now()),
+        name: cleanName,
+        email: cleanEmail,
+        status: "Active",
+        image: remoteUrl || image, // Use remote uploaded image path or fallback to local
+      };
+
+      setManagers([confirmedManager, ...managers]);
+      Alert.alert("Success", `Account for ${cleanName} has been authorized.`);
       
-      // Reset layout forms
+      // 5. Clean out input layouts
       setName("");
       setEmail("");
       setPassword("");
       setImage(null);
+
     } catch (error) {
-      Alert.alert("Error", "Could not create manager profile.");
+      console.error("Manager creation error:", error);
+      Alert.alert("Error", error.message || "Could not create manager profile.");
     } finally {
       setIsSubmitting(false);
     }
@@ -126,7 +179,7 @@ export default function ManageManagers() {
           <Ionicons name="arrow-back-outline" size={22} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Staff Accounts</Text>
-        <View style={{ width: 40 }} /> {/* Layout Spacer */}
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Intro Header Section */}
@@ -269,21 +322,13 @@ export default function ManageManagers() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   contentContainer: { padding: 20, paddingBottom: 40 },
-  
-  // Navigation
   navHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, marginBottom: 20 },
   backButton: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
   navTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-  
-  // Intro Section
   introSection: { marginBottom: 24 },
   mainTitle: { fontSize: 24, fontWeight: "700", color: "#0F172A" },
   subtitle: { fontSize: 13, color: "#64748B", marginTop: 6, lineHeight: 18 },
-  
-  // Form Configuration
   formContainer: { backgroundColor: "#FFF", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 28 },
-  
-  // Profile Image Input Styles
   imagePickerCenterBlock: { alignItems: "center", marginBottom: 20, marginTop: 4 },
   imagePickerFrame: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0", borderStyle: "dashed", overflow: "hidden", justifyContent: "center", alignItems: "center" },
   avatarPlaceholderWrapper: { alignItems: "center", justifyContent: "center" },
@@ -291,7 +336,6 @@ const styles = StyleSheet.create({
   selectedAvatarPreview: { width: "100%", height: "100%", resizeMode: "cover" },
   removeImageBadge: { marginTop: 6, paddingVertical: 2, paddingHorizontal: 8 },
   removeImageText: { fontSize: 12, color: "#EF4444", fontWeight: "600" },
-
   inputLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 6 },
   inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, height: 48, marginBottom: 16, paddingHorizontal: 14 },
   inputIcon: { marginRight: 10 },
@@ -299,8 +343,6 @@ const styles = StyleSheet.create({
   eyeBtn: { padding: 4 },
   submitButton: { height: 48, backgroundColor: "#8B5CF6", borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 8 },
   submitButtonText: { color: "#FFF", fontSize: 15, fontWeight: "600" },
-
-  // List Layouts
   sectionTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A", marginBottom: 14 },
   managerCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", padding: 14, borderRadius: 14, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 12 },
   avatarContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" },
@@ -313,7 +355,6 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#16A34A", marginRight: 4 },
   statusText: { fontSize: 10, fontWeight: "600", color: "#16A34A" },
   deleteButton: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#FEE2E2" },
-  
   emptyContainer: { alignItems: "center", justifyContent: "center", padding: 32, backgroundColor: "#FFF", borderRadius: 14, borderWidth: 1, borderColor: "#E2E8F0", borderStyle: "dashed" },
   emptyText: { color: "#94A3B8", fontSize: 13, marginTop: 8 },
 });

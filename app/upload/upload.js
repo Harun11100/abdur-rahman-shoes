@@ -6,7 +6,7 @@ export const uploadImages = async (
   try {
     const { data } =
       await axios.post(
-        "https://kashimpur-property-hub.vercel.app/api/admin/cloudinary",
+        "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/cloudinary",
         formData,
         {
           headers: {
@@ -15,7 +15,7 @@ export const uploadImages = async (
           },
         }
       );
-
+      
     if (!data?.urls) {
       return [];
     }
