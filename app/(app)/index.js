@@ -193,14 +193,7 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.coverContainer}>
-        <Image 
-          source={{ uri: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop" }} 
-          style={styles.coverPhoto} 
-        />
-        <View style={styles.coverOverlay} />
-      </View>
-
+     
       <ScrollView 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
@@ -215,6 +208,14 @@ export default function Dashboard() {
           />
         }
       >
+       <View style={styles.coverContainer}>
+        <Image 
+          source={{ uri: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop" }} 
+          style={styles.coverPhoto} 
+        />
+        <View style={styles.coverOverlay} />
+      </View>
+
         <View style={styles.headerProfileWrapper}>
           <View style={styles.profilePlacementRow}>
             <View style={styles.profilePhotoContainer}>

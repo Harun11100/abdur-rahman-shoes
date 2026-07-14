@@ -16,22 +16,20 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { uploadImages } from "../../upload/upload";
 import * as ImagePicker from "expo-image-picker";
+// ... [Your imports and pickImages remain the same]
 
 export default function RestockProductForm() {
   const router = useRouter();
   
-  // Form State Engines
-  const [formType, setFormType] = useState("new"); // "new" or "restock"
+  const [formType, setFormType] = useState("new"); 
   const [prodName, setProdName] = useState("");
   const [prodCode, setProdCode] = useState("");
   const [modelNumber, setModelNumber] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [productImages, setProductImages] = useState([]); // Correct flat array initialization
-  
-  // Dynamic Footwear Category Engine additions
-  const [selectedCategory, setSelectedCategory] = useState("Men"); // "Men", "Women", "Children"
+  const [productImages, setProductImages] = useState([]); 
+  const [selectedCategory, setSelectedCategory] = useState("Men"); 
 
   const pickImages = async () => {
     try {
@@ -44,12 +42,11 @@ export default function RestockProductForm() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
-        selectionLimit:3,
+        selectionLimit: 3,
         quality: 0.7,
       });
 
       if (!result.canceled) {
-        // Fixed: Use correct setProductImages and slice against the combined flat array
         setProductImages((prev) => [...prev, ...result.assets].slice(0, 3));
       }
     } catch (error) {
@@ -58,11 +55,9 @@ export default function RestockProductForm() {
   };
 
   const removeImage = (index) => {
-    // Fixed: Use correct setProductImages filtering the array directly
     setProductImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Compute targeted ranges seamlessly based on localized regional standards
   const availableSizes = useMemo(() => {
     let start = 39, end = 45;
     if (selectedCategory === "Women") { start = 36; end = 45; }
@@ -75,40 +70,47 @@ export default function RestockProductForm() {
     return sizesArray;
   }, [selectedCategory]);
 
-  const [selectedSize, setSelectedSize] = useState("39"); // Default operational sizing focus
+  const [selectedSize, setSelectedSize] = useState("39"); 
 
-  // Auto-correct active focus size whenever user transitions segment category track
   useEffect(() => {
     if (selectedCategory === "Men") setSelectedSize("39");
     else if (selectedCategory === "Women") setSelectedSize("36");
     else if (selectedCategory === "Children") setSelectedSize("15");
   }, [selectedCategory]);
   
-  // Track continuous stock quantities across all possible structural variations
   const [sizeQuantities, setSizeQuantities] = useState({
-    "15":"0","16":"0","17":"0", "18": "0", "19": "0", "20": "0", "21": "0",
-    "22": "0", "23": "0", "24": "0", "25": "0", "26": "0", "27": "0", "28": "0",
-    "29": "0","30": "0","31": "0", "32": "0", "33": "0", "34": "0", "35": "0",
-    "35": "0", "36": "0", "37": "0", "38": "0", "39": "0", "40": "0",
-    "41": "0", "42": "0", "43": "0", "44": "0", "45": "0", 
+    Men: { "39": "0", "40": "0", "41": "0", "42": "0", "43": "0", "44": "0", "45": "0" },
+    Women: { "36": "0", "37": "0", "38": "0", "39": "0", "40": "0", "41": "0", "42": "0", "43": "0", "44": "0", "45": "0" },
+    Children: {
+      "15":"0","16":"0","17":"0", "18": "0", "19": "0", "20": "0", "21": "0",
+      "22": "0", "23": "0", "24": "0", "25": "0", "26": "0", "27": "0", "28": "0",
+      "29": "0","30": "0","31": "0", "32": "0", "33": "0", "34": "0", "35": "0",
+      "36": "0", "37": "0", "38": "0", "39": "0", "40": "0"
+    },
   });
-
+  
   const adjustQuantity = (amount) => {
-    const current = parseInt(sizeQuantities[selectedSize], 10) || 0;
+    const current = parseInt(sizeQuantities[selectedCategory][selectedSize], 10) || 0;
     const computed = current + amount;
     const updatedValue = computed >= 0 ? String(computed) : "0";
     
-    setSizeQuantities({
-      ...sizeQuantities,
-      [selectedSize]: updatedValue,
-    });
+    setSizeQuantities(prev => ({
+      ...prev,
+      [selectedCategory]: {
+        ...prev[selectedCategory],
+        [selectedSize]: updatedValue,
+      },
+    }));
   };
 
   const handleManualQtyChange = (text) => {
-    setSizeQuantities({
-      ...sizeQuantities,
-      [selectedSize]: text.replace(/[^0-9]/g, ""),
-    });
+    setSizeQuantities(prev => ({
+      ...prev,
+      [selectedCategory]: {
+        ...prev[selectedCategory],
+        [selectedSize]: text.replace(/[^0-9]/g, ""),
+      },
+    }));
   };
 
   const handleFormSubmit = async () => {
@@ -121,28 +123,31 @@ export default function RestockProductForm() {
       Alert.alert("Required Fields Missing", "Please scan or enter the target Shoe Base SKU.");
       return;
     }
-    // Fixed: Corrected property access on flat productImages array
-    if (productImages.length === 0) {
+    // Fixed: Require images only when creating a completely NEW product profile
+    if (formType === "new" && productImages.length === 0) {
       return Alert.alert("Image Required", "Please add at least one image.");
     }
 
     try {
       setIsSubmitting(true);
-      const imageFormData = new FormData();
-      
-      // Fixed: Append items directly from productImages state
-      productImages.forEach((img) => {
-        imageFormData.append("images", {
-          uri: img.uri,
-          name: img.fileName || `product-${Date.now()}.jpg`,
-          type: img.mimeType || "image/jpeg",
-        });
-      });
+      let remoteUrls = [];
 
-      // Fixed: Avoid variable shadow collisions by using remoteUrls instead of uploadedImages
-      const remoteUrls = await uploadImages(imageFormData);
-      if (!remoteUrls || remoteUrls.length === 0) {
-        throw new Error("Image upload failed");
+      // Only handle media upload tasks if we are creating a new item
+      if (formType === "new") {
+        const imageFormData = new FormData();
+        productImages.forEach((img) => {
+          const fileExtension = img.uri.substring(img.uri.lastIndexOf(".") + 1);
+          imageFormData.append("images", {
+            uri: Platform.OS === "ios" ? img.uri.replace("file://", "") : img.uri,
+            name: img.fileName || `product-${Date.now()}.${fileExtension}`,
+            type: img.mimeType || `image/${fileExtension}`,
+          });
+        });
+
+        remoteUrls = await uploadImages(imageFormData);
+        if (!remoteUrls || remoteUrls.length === 0) {
+          throw new Error("Image upload failed");
+        }
       }
 
       const payload = {
@@ -153,12 +158,14 @@ export default function RestockProductForm() {
         selectedCategory,
         selectedSize,
         sizeQuantities: formType === "new" 
-          ? sizeQuantities 
-          : { [selectedSize]: sizeQuantities[selectedSize] },
+          ? sizeQuantities[selectedCategory] 
+          : { [selectedSize]: sizeQuantities[selectedCategory][selectedSize] },
         costPrice: costPrice || "0",
         sellingPrice: sellingPrice,
         images: remoteUrls, 
       };
+
+      console.log("Prepared Payload for Submission:", payload);
 
       const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/product"; 
 
@@ -189,11 +196,16 @@ export default function RestockProductForm() {
         setModelNumber("");
         setCostPrice("");
         setSellingPrice("");
-        setProductImages([]); // Clean up preview images on success
+        setProductImages([]); 
         
-        const cleanReset = { ...sizeQuantities };
-        Object.keys(cleanReset).forEach(key => cleanReset[key] = "0");
-        setSizeQuantities(cleanReset);
+        // Fixed: Safe Deep Reset without mutating or destroying the schema structure
+        const deepReset = JSON.parse(JSON.stringify(sizeQuantities));
+        Object.keys(deepReset).forEach(cat => {
+          Object.keys(deepReset[cat]).forEach(size => {
+            deepReset[cat][size] = "0";
+          });
+        });
+        setSizeQuantities(deepReset);
       }
 
     } catch (error) {
@@ -204,6 +216,7 @@ export default function RestockProductForm() {
     }
   };
 
+  // ... [Return JSX blocks remain the exact same]
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -386,7 +399,7 @@ export default function RestockProductForm() {
                     Size {size}
                   </Text>
                   <Text style={[styles.sizeStockIndicator, isSelected ? styles.activeSizeStockIndicator : null]}>
-                    ({sizeQuantities[size] || 0} pairs)
+                  ({sizeQuantities[selectedCategory][size] || 0} pairs)
                   </Text>
                 </TouchableOpacity>
               );
@@ -405,7 +418,7 @@ export default function RestockProductForm() {
             <TextInput
               style={styles.counterInput}
               keyboardType="number-pad"
-              value={sizeQuantities[selectedSize] || "0"}
+           value={sizeQuantities[selectedCategory][selectedSize] || "0"}
               onChangeText={handleManualQtyChange}
               textAlign="center"
             />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,66 +8,185 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-// Mock Database Initializer for Footwear Catalog Grid
-const INITIAL_CATALOG = [
-  {
-    id: "1",
-    name: "Nike Air Max Alpha",
-    sku: "NKE-AIRMAX-2026",
-    colorway: "Black-Crimson-004",
-    costPrice: "4200",
-    sellingPrice: "5800",
-    sizes: { "6": 5, "7": 10, "8": 15, "9": 12, "10": 8, "11": 4 },
-  },
-  {
-    id: "2",
-    name: "Adidas UltraBoost Light",
-    sku: "ADI-UB-WHT",
-    colorway: "Cloud White / Silver",
-    costPrice: "6500",
-    sellingPrice: "8900",
-    sizes: { "6": 2, "7": 4, "8": 0, "9": 7, "10": 5, "11": 1 },
-  },
-  {
-    id: "3",
-    name: "Puma Velocity Nitro 3",
-    sku: "PMA-NITRO-BLU",
-    colorway: "Electric Blue / Neon",
-    costPrice: "3800",
-    sellingPrice: "5200",
-    sizes: { "6": 8, "7": 6, "8": 10, "9": 4, "10": 0, "11": 0 },
-  },
-];
+const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/getProducts";
+const LIMIT = 10;
 
 export default function ManageCatalog() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [catalogItems, setCatalogItems] = useState(INITIAL_CATALOG);
+  const [catalogItems, setCatalogItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
 
-  // Computed metric tracker to instantly surface out of stock individual variant sizes
-  const getTotalPairs = (sizesObj) => {
-    return Object.values(sizesObj).reduce((acc, qty) => acc + qty, 0);
+  // Use a ref to lock duplicate concurrent scroll requests
+  const onEndReachedCalledDuringMomentum = useRef(true);
+
+  // 1. Unified API Fetch Logic supporting Pagination
+  const fetchCatalog = async (query = "", pageNum = 1, append = false) => {
+    if (pageNum === 1 && !isRefreshing) {
+      setIsLoading(true);
+    } else if (pageNum > 1) {
+      setIsFetchingNextPage(true);
+    }
+
+    try {
+      const cleanQuery = query.trim();
+      let targetUrl = `${BACKEND_URL}?page=${pageNum}&limit=${LIMIT}`;
+      if (cleanQuery !== "") {
+        targetUrl += `&q=${encodeURIComponent(cleanQuery)}`;
+      }
+
+      const response = await fetch(targetUrl);
+      const json = await response.json();
+      
+      if (response.ok && json.success) {
+        const products = (json.data || json.suggestions || []).map((prod) => ({
+          id: prod._id || prod.id,
+          name: prod.prodName || prod.name || "Unknown Product Name",
+          sku: prod.prodCode || prod.sku || "",
+          colorway: prod.modelNumber || prod.colorway || "Standard Colorway",
+          costPrice: String(prod.costPrice || "0"),
+          sellingPrice: String(prod.sellingPrice || "0"),
+          sizes: prod.sizeQuantities || prod.sizes || {},
+        }));
+
+        setCatalogItems((prevItems) => (append ? [...prevItems, ...products] : products));
+        setHasMore(json.hasMore ?? false);
+        setPage(pageNum);
+      } else {
+        throw new Error(json.message || "Failed to retrieve catalog schema.");
+      }
+    } catch (error) {
+      console.error("Database connection failure:", error);
+      Alert.alert(
+        "Network Interrupted", 
+        "Could not load physical store stock catalogs right now. Please check your network connection."
+      );
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setIsFetchingNextPage(false);
+    }
   };
 
-  // Live filter query matching Name or SKU parameters
-  const filteredCatalog = catalogItems.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // 2. Debounce Search Queries and reset pagination
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setPage(1);
+      setHasMore(true);
+      fetchCatalog(searchQuery, 1, false);
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // 3. Pull-To-Refresh Reset Handler
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setSearchQuery(""); 
+    setPage(1);
+    setHasMore(true);
+    fetchCatalog("", 1, false);
+  }, []);
+
+  // 4. Infinite Scroll Trigger (Load More on bottom reached)
+  const handleLoadMore = () => {
+    if (!onEndReachedCalledDuringMomentum.current && hasMore && !isFetchingNextPage && !isLoading) {
+      onEndReachedCalledDuringMomentum.current = true;
+      fetchCatalog(searchQuery, page + 1, true);
+    }
+  };
+
+  // Safe helper to compile total pairs
+  const getTotalPairs = (sizesObj) => {
+    if (!sizesObj || typeof sizesObj !== "object") return 0;
+    let grandTotal = 0;
+    const hasSubCategories = ["Men", "Women", "Children"].some(cat => cat in sizesObj);
+
+    if (hasSubCategories) {
+      Object.values(sizesObj).forEach((categoryMap) => {
+        if (categoryMap && typeof categoryMap === "object") {
+          Object.values(categoryMap).forEach((qty) => {
+            grandTotal += parseInt(qty, 10) || 0;
+          });
+        }
+      });
+    } else {
+      Object.values(sizesObj).forEach((qty) => {
+        grandTotal += parseInt(qty, 10) || 0;
+      });
+    }
+    return grandTotal;
+  };
+
+  // Safe helper to map visual size pills
+  const renderSizePills = (sizesObj) => {
+    if (!sizesObj || typeof sizesObj !== "object") {
+      return <Text style={styles.noSizesPlaceholder}>No sizes configured yet</Text>;
+    }
+    const hasSubCategories = ["Men", "Women", "Children"].some(cat => cat in sizesObj);
+    let sizeEntries = [];
+
+    if (hasSubCategories) {
+      const mergedMap = {};
+      ["Men", "Women", "Children"].forEach((cat) => {
+        if (sizesObj[cat] && typeof sizesObj[cat] === "object") {
+          Object.entries(sizesObj[cat]).forEach(([sz, qty]) => {
+            const currentQty = parseInt(mergedMap[sz] || "0", 10);
+            mergedMap[sz] = String(currentQty + (parseInt(qty, 10) || 0));
+          });
+        }
+      });
+      sizeEntries = Object.entries(mergedMap);
+    } else {
+      sizeEntries = Object.entries(sizesObj);
+    }
+
+    sizeEntries.sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]));
+    if (sizeEntries.length === 0) {
+      return <Text style={styles.noSizesPlaceholder}>No sizes configured yet</Text>;
+    }
+
+    return sizeEntries.map(([size, qtyStr]) => {
+      const qty = parseInt(qtyStr, 10) || 0;
+      return (
+        <View 
+          key={size} 
+          style={[
+            styles.sizePill, 
+            qty === 0 ? styles.sizePillEmpty : qty < 5 ? styles.sizePillLow : null
+          ]}
+        >
+          <Text style={[styles.sizePillNum, qty === 0 ? styles.disabledText : null]}>EU {size}</Text>
+          <Text style={[styles.sizePillQty, qty === 0 ? styles.disabledTextQty : qty < 5 ? styles.lowTextQty : null]}>
+            {qty}
+          </Text>
+        </View>
+      );
+    });
+  };
 
   const renderProductCard = ({ item }) => {
     const totalStock = getTotalPairs(item.sizes);
+    const costPriceNum = parseInt(item.costPrice, 10) || 0;
+    const sellingPriceNum = parseInt(item.sellingPrice, 10) || 0;
     
     return (
       <View style={styles.catalogCard}>
-        {/* Top Segment Info Headers - FIXED: Changed <div> to native <View> */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
             <Text style={styles.productSku}>{item.sku} • <Text style={styles.colorwayText}>{item.colorway}</Text></Text>
           </View>
@@ -78,7 +197,6 @@ export default function ManageCatalog() {
           </View>
         </View>
 
-        {/* Pricing Segment Breakdown Columns */}
         <View style={styles.pricingDividerRow}>
           <View>
             <Text style={styles.priceLabel}>Cost Matrix</Text>
@@ -90,30 +208,15 @@ export default function ManageCatalog() {
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={styles.priceLabel}>Margin</Text>
-            <Text style={styles.marginValue}>+৳{parseInt(item.sellingPrice) - parseInt(item.costPrice)}</Text>
+            <Text style={styles.marginValue}>+৳{sellingPriceNum - costPriceNum}</Text>
           </View>
         </View>
 
-        {/* Dynamic Size Variant Chips Row Grid */}
         <Text style={styles.sizeSectionHeader}>Stock Level Across Variant Matrix:</Text>
         <View style={styles.sizeMatrixTrack}>
-          {Object.entries(item.sizes).map(([size, qty]) => (
-            <View 
-              key={size} 
-              style={[
-                styles.sizePill, 
-                qty === 0 ? styles.sizePillEmpty : qty < 5 ? styles.sizePillLow : null
-              ]}
-            >
-              <Text style={[styles.sizePillNum, qty === 0 ? styles.disabledText : null]}>UK {size}</Text>
-              <Text style={[styles.sizePillQty, qty === 0 ? styles.disabledTextQty : qty < 5 ? styles.lowTextQty : null]}>
-                {qty}
-              </Text>
-            </View>
-          ))}
+          {renderSizePills(item.sizes)}
         </View>
 
-        {/* Individual Card Context Management Actions Footer */}
         <View style={styles.cardActionsFooter}>
           <TouchableOpacity 
             style={styles.actionOutlineBtn}
@@ -123,7 +226,10 @@ export default function ManageCatalog() {
             <Text style={styles.actionOutlineBtnText}>Restock Sizes</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.editActionBtn}>
+          <TouchableOpacity 
+            style={styles.editActionBtn}
+            onPress={() => Alert.alert("Feature Notice", "Detailed property modification is arriving soon.")}
+          >
             <Ionicons name="create-outline" size={14} color="#1E293B" />
             <Text style={styles.editActionBtnText}>Edit Details</Text>
           </TouchableOpacity>
@@ -132,17 +238,26 @@ export default function ManageCatalog() {
     );
   };
 
+  // Footer spinner for loading the next page
+  const renderFooter = () => {
+    if (!isFetchingNextPage) return <View style={{ height: 20 }} />;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#10B981" />
+        <Text style={styles.footerLoaderText}>Loading more products...</Text>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" />
       
-      {/* Dynamic Upper Top Title Dashboard Ribbon Row */}
       <View style={styles.headerRibbon}>
         <View>
           <Text style={styles.screenHeading}>Shoe Catalog</Text>
           <Text style={styles.screenSubheading}>Manage items, models</Text>
         </View>
-        
         <TouchableOpacity 
           style={styles.primaryAddBtn}
           onPress={() => router.push("/products/restock")}
@@ -153,7 +268,6 @@ export default function ManageCatalog() {
         </TouchableOpacity>
       </View>
 
-      {/* Persistent Dynamic Filter Search Wrapper Box */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
@@ -168,28 +282,58 @@ export default function ManageCatalog() {
         </View>
       </View>
 
-      {/* Main Core Scrollable Render Grid List Layout */}
-      <FlatList
-        data={filteredCatalog}
-        keyExtractor={(item) => item.id}
-        renderItem={renderProductCard}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyStateContainer}>
-            <Ionicons name="cube-outline" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyStateTitle}>No Footwear Found</Text>
-            <Text style={styles.emptyStateSubtitle}>Try refining your query search syntax or insert a new product code entry.</Text>
-          </View>
-        }
-      />
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#10B981" />
+          <Text style={styles.loaderText}>Syncing store ledger inventories...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={catalogItems}
+          keyExtractor={(item) => item.id}
+          renderItem={renderProductCard}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          
+          // Pull-to-refresh
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={["#10B981"]}
+            />
+          }
+
+          // Pagination Attributes
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.2}
+          onMomentumScrollBegin={() => { onEndReachedCalledDuringMomentum.current = false; }}
+          ListFooterComponent={renderFooter}
+
+          ListEmptyComponent={
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="cube-outline" size={48} color="#CBD5E1" />
+              <Text style={styles.emptyStateTitle}>No Footwear Found</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                {searchQuery 
+                  ? "Try refining your search query." 
+                  : "Database registry is empty. Tap 'Add Shoe' to initialize your digital catalogs."}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeContainer: { flex: 1, backgroundColor: "#F8FAFC" },
-  listContent: { padding: 16, paddingBottom: 40 },
+  listContent: { padding: 16, paddingBottom: 20 },
+
+  // Loader styles
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loaderText: { marginTop: 12, fontSize: 13, color: "#64748B", fontWeight: "600" },
 
   // Header Dashboard Ribbon
   headerRibbon: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 16, marginBottom: 14 },
@@ -229,8 +373,9 @@ const styles = StyleSheet.create({
 
   // Size Multi Variant Map Sections
   sizeSectionHeader: { fontSize: 11, fontWeight: "600", color: "#475569", marginBottom: 6 },
-  sizeMatrixTrack: { flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
-  sizePill: { flex: 1, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 8, paddingVertical: 6, alignItems: "center", marginRight: 4 },
+  sizeMatrixTrack: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", marginBottom: 14 },
+  noSizesPlaceholder: { fontSize: 12, fontStyle: "italic", color: "#94A3B8", paddingVertical: 4 },
+  sizePill: { minWidth: 48, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 8, paddingVertical: 6, alignItems: "center", marginRight: 6, marginBottom: 6 },
   sizePillEmpty: { backgroundColor: "#F8FAFC", borderColor: "#F1F5F9" },
   sizePillLow: { borderColor: "#FED7AA" },
   sizePillNum: { fontSize: 10, fontWeight: "600", color: "#64748B" },
@@ -245,6 +390,10 @@ const styles = StyleSheet.create({
   actionOutlineBtnText: { color: "#475569", fontSize: 12, fontWeight: "600", marginLeft: 4 },
   editActionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#E2E8F0", borderRadius: 8, paddingVertical: 6, flex: 0.48 },
   editActionBtnText: { color: "#1E293B", fontSize: 12, fontWeight: "600", marginLeft: 4 },
+
+  // Footer loader for infinite scroll
+  footerLoader: { paddingVertical: 20, alignItems: "center", justifyContent: "center", flexDirection: "row" },
+  footerLoaderText: { marginLeft: 8, fontSize: 12, color: "#64748B", fontWeight: "500" },
 
   // Empty List Indicators
   emptyStateContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },

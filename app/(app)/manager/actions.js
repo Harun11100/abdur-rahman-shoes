@@ -227,6 +227,9 @@ export default function ManagerActions() {
   };
 
   return (
+       <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    style={{ flex: 1 }}>
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" />
 
@@ -355,11 +358,7 @@ export default function ManagerActions() {
 
             {/* Custom Negotiated Price Input Section */}
             {activeSizeObj && activeSizeObj.quantity > 0 && (
-              <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    style={{ flex: 1 }}>
-
-                
+            
               <View style={styles.negotiationBlock}>
                 <Text style={styles.adjustmentLabel}>Negotiated Price per Unit (৳)</Text>
                 <View style={styles.inputWrapper}>
@@ -382,26 +381,9 @@ export default function ManagerActions() {
                   )}
                 </View>
               </View>
-              </KeyboardAvoidingView>
+              
             )}
-
-            {/* Current Context Breakdown Sub-panel */}
-            {activeSizeObj && (
-              <View style={styles.statusContextBox}>
-                <Ionicons 
-                  name={activeSizeObj.quantity <= 3 ? "warning-outline" : "checkmark-circle-outline"} 
-                  size={18} 
-                  color={activeSizeObj.quantity <= 3 ? "#D97706" : "#16A34A"} 
-                />
-                <Text style={styles.statusContextText}>
-                  {activeSizeObj.quantity <= 0 
-                    ? `Warning: Size ${activeSizeObj.size} is fully depleted.` 
-                    : activeSizeObj.quantity <= 3 
-                      ? `Warning: Running low on Size ${activeSizeObj.size} stock.`
-                      : `Inventory stable. ${activeSizeObj.quantity} units available for custom transaction entry.`}
-                </Text>
-              </View>
-            )}
+          
 
             {/* Point of Sale Submission Footer */}
             <View style={styles.actionPanelWrapper}>
@@ -440,6 +422,7 @@ export default function ManagerActions() {
         )}
       </ScrollView>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
