@@ -15,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "../store/authStore";
+import { registerForPushNotificationsAsync } from "../services/notification";
 
 const { width } = Dimensions.get("window");
 
@@ -48,6 +49,7 @@ export default function Login() {
     const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/login"; 
 
     try {
+        const expoToken =await registerForPushNotificationsAsync();
       // 1. Fire the network request payload to the backend router route
       const response = await fetch(BACKEND_URL, {
         method: "POST",
@@ -58,6 +60,7 @@ export default function Login() {
           email: cleanEmail,
           password: cleanPassword,
           role: role,
+          expoToken: expoToken || null, 
         }),
       });
 
