@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImages } from "../../upload/upload";
+import Constants from "expo-constants";
+const API_URL = Constants.expoConfig?.extra?.API_URL;
 
 export default function ManageManagers() {
   const router = useRouter();
@@ -26,11 +28,33 @@ export default function ManageManagers() {
   const [secureText, setSecureText] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initial list of managers assigned to the system
-  const [managers, setManagers] = useState([
-    { id: "1", name: "Rahat Khan", email: "rahat@company.com", status: "Active", image: null },
-    { id: "2", name: "Anika Ahmed", email: "anika@company.com", status: "Active", image: null },
-  ]);
+   const [managers, setManagers] = useState([]);
+   const [isLoadingManagers, setIsLoadingManagers] = useState(true);
+   const fetchManagers = async () => {
+  try {
+    setIsLoadingManagers(true);
+
+    const response = await fetch(
+      `${API_URL}/api/admin/getManagers`
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to fetch managers.");
+    }
+
+    setManagers(result.data);
+  } catch (error) {
+ 
+    Alert.alert("Error", error.message);
+  } finally {
+    setIsLoadingManagers(false);
+  }
+};
+useEffect(() => {
+  fetchManagers();
+}, []);
 
   // Handle image selection from device gallery
   const pickImage = async () => {
@@ -74,7 +98,7 @@ export default function ManageManagers() {
     }
 
     setIsSubmitting(true);
-    const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/managerRegister"; 
+    const BACKEND_URL = `${API_URL}/api/admin/managerRegister`;
 
     try {
       let remoteUrl = null;
@@ -105,7 +129,7 @@ export default function ManageManagers() {
         image: remoteUrl, // Contains either the remote URL string or null
       };
 
-      console.log("Payload for manager creation:", payload);
+    
 
       // 2. Execute network request
       const response = await fetch(BACKEND_URL, {
@@ -149,22 +173,76 @@ export default function ManageManagers() {
     }
   };
 
-  const handleDeleteManager = (id, managerName) => {
-    Alert.alert(
-      "Revoke Clearance",
-      `Are you sure you want to delete ${managerName}'s access credentials?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: () => {
-            setManagers(managers.filter((m) => m.id !== id));
-          } 
-        }
-      ]
-    );
-  };
+const handleDeleteManager = (id, managerName) => {
+
+  
+  Alert.alert(
+    "Revoke Clearance",
+    `Are you sure you want to delete ${managerName}'s access credentials?`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await fetch(
+              `${API_URL}/api/admin/deleteManager/${id}`,
+              {
+                method: "DELETE",
+              }
+            );
+
+            const data = await response.json();
+
+            if (data.success) {
+              // Remove deleted manager from UI
+              setManagers((prevManagers) =>
+                prevManagers.filter((manager) => manager._id !== id)
+              );
+
+              Alert.alert(
+                "Success",
+                "Manager deleted successfully."
+              );
+            } else {
+              Alert.alert(
+                "Error",
+                data.message || "Failed to delete manager."
+              );
+            }
+
+          } catch (error) {
+          
+
+            Alert.alert(
+              "Error",
+              "Something went wrong while deleting manager."
+            );
+          }
+        },
+      },
+    ]
+  );
+};
+
+  if (isLoadingManagers) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <ActivityIndicator size="large" color="#2563EB" />
+      <Text style={{ marginTop: 12 }}>Loading Managers...</Text>
+    </View>
+  );
+}
 
   return (
     <ScrollView 
@@ -289,7 +367,7 @@ export default function ManageManagers() {
           <View key={item.id} style={styles.managerCard}>
             <View style={styles.avatarContainer}>
               {item.image ? (
-                <Image source={{ uri: item.image }} style={styles.listAvatarImage} />
+                <Image source={{ uri: item.image.url }} style={styles.listAvatarImage} />
               ) : (
                 <Text style={styles.avatarText}>
                   {getInitials(item.name)}
@@ -308,7 +386,7 @@ export default function ManageManagers() {
 
             <TouchableOpacity 
               style={styles.deleteButton} 
-              onPress={() => handleDeleteManager(item.id, item.name)}
+              onPress={() => handleDeleteManager(item._id, item.name)}
             >
               <Ionicons name="trash-outline" size={20} color="#EF4444" />
             </TouchableOpacity>

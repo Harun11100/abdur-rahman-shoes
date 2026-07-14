@@ -1,41 +1,66 @@
-// store/authStore.js
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const useAuthStore = create((set) => ({
   user: null,
   isAuthenticated: false,
-  isHydrated: false, // Tracks if we've finished reading from AsyncStorage
+  isHydrated: false,
+  isLoading: false,
 
-  // Called once when the root layout mounts
+  // Restore session when app starts
   checkSavedSession: async () => {
     try {
       const savedUser = await AsyncStorage.getItem("@user_session");
+
       if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        set({ user: parsedUser, isAuthenticated: true });
+        set({
+          user: JSON.parse(savedUser),
+          isAuthenticated: true,
+        });
       }
-    } catch (e) {
-      console.error("Error reading authentication state", e);
+    } catch (error) {
+      console.log("Session Restore Error:", error);
     } finally {
-      set({ isHydrated: true });
+      set({
+        isHydrated: true,
+      });
     }
   },
 
-  login: async (email, password, role) => {
-    // Mimic API logic
-    const mockUser = {
-      name: role === "admin" ? "AyEsha(Admin)" : "Ayesha",
-      role: role,
-      email: email,
-    };
+  // Save authenticated user returned from backend
+  login: async (userData) => {
+    try {
+      set({ isLoading: true });
 
-    await AsyncStorage.setItem("@user_session", JSON.stringify(mockUser));
-    set({ user: mockUser, isAuthenticated: true });
+      await AsyncStorage.setItem(
+        "@user_session",
+        JSON.stringify(userData)
+      );
+
+      set({
+        user: userData,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.log("Login Error:", error);
+
+      set({
+        isLoading: false,
+      });
+    }
   },
 
   logout: async () => {
-    await AsyncStorage.removeItem("@user_session");
-    set({ user: null, isAuthenticated: false });
+    try {
+      await AsyncStorage.removeItem("@user_session");
+
+      set({
+        user: null,
+        isAuthenticated: false,
+      });
+    } catch (error) {
+      console.log("Logout Error:", error);
+    }
   },
 }));
