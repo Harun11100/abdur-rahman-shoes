@@ -164,6 +164,19 @@ export default function Dashboard() {
     }
   };
 
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+
+  return new Date(dateString).toLocaleString("en-BD", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
   const stats = [
     { id: 1, title: "Products Available", value: productsAvailable, icon: "cube-outline" , color: "#3B82F6", bgColor: "#EFF6FF" },
     { id: 2, title: "In Stock Total", value: totalStockCount, icon: "archive-outline" , color: "#10B981", bgColor: "#ECFDF5" },
@@ -174,10 +187,11 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { title: "Daily Sales Log", icon: "receipt-outline", color: "#F59E0B", path: "/history/daily", roles: ["admin", "manager"] },
+    { title: "Restock Exiting", icon: "receipt-outline", color: "#F59E0B", path: "/products/restock", roles: ["admin"] },
     { title: "Manage Catalog", icon: "options-outline", color: "#3B82F6", path: "/products/manage", roles: ["admin"] },
-    { title: "Restock Inbound", icon: "add-circle-outline", color: "#10B981", path: "/products/restock", roles: ["admin"] },
+    { title: "Add Product", icon: "add-circle-outline", color: "#10B981", path: "/products/addNewProduct", roles: ["admin"] },
     { title: "Manager Accounts", icon: "people-outline", color: "#8B5CF6", path: "/admin/users", roles: ["admin"] },
+    { title: "Sales History", icon: "time-outline", color: "#F97316", path: "/history/daily", roles: ["admin", "manager"] },
   ];
 
   const filteredActions = quickActions.filter(action => action.roles.includes(userRole));
@@ -190,6 +204,8 @@ export default function Dashboard() {
       </View>
     );
   }
+
+
 
   return (
     <View style={styles.container}>
@@ -357,7 +373,10 @@ export default function Dashboard() {
                     <Text style={styles.saleProductsDescription} numberOfLines={1}>
                       {sale.items}
                     </Text>
-                    <Text style={styles.saleTimestamp}>{sale.time}</Text>
+                    <Text style={styles.saleTimestamp}> 
+                    {formatDate(sale.time)}
+
+                    </Text>
                   </View>
                 </View>
 

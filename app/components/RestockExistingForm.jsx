@@ -13,9 +13,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import Constants from "expo-constants";
-
-const API_URL = Constants.expoConfig?.extra?.API_URL;
 
 export default function RestockExistingForm() {
   const router = useRouter();
@@ -30,54 +27,40 @@ export default function RestockExistingForm() {
   // Key-value store tracking only changed size variations (e.g., {"39": 5, "42": -2})
   const [restockUpdates, setRestockUpdates] = useState({});
 
-  // Dynamic state tracking absolute pricing modifications
-  const [costPrice, setCostPrice] = useState("");
-  const [sellingPrice, setSellingPrice] = useState("");
-
   // 1. Fetch existing profile configuration from backend
-const handleFetchProduct = async () => {
-  if (!modelNumber.trim()) {
-    Alert.alert(
-      "Required Input",
-      "Please provide a valid Product SKU or Model Number."
-    );
-    return;
-  }
-
-  try {
-    setIsFetching(true);
-    setHasFetched(false);
-
-    const response = await fetch(
-      `${API_URL}/api/admin/product/${modelNumber.trim().toUpperCase()}`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Product not found.");
+  const handleFetchProduct = async () => {
+    if (!modelNumber.trim()) {
+      Alert.alert("Required Input", "Please provide a valid Product SKU or Model Number.");
+      return;
     }
 
-    setProductDetails(result.data);
-    setRestockUpdates({});
-    setCostPrice(result.data.costPrice ?? "0");
-    setSellingPrice(result.data.sellingPrice ?? "0");
-    setHasFetched(true);
-  } catch (error) {
-    console.error(error);
-    Alert.alert("Profile Lookup Failed", error.message);
-  } finally {
-    setIsFetching(false);
-  }
-};
+    try {
+      setIsFetching(true);
+      setHasFetched(false);
+      
+      // Update this endpoint matching your API syntax mapping rules
+      const FETCH_URL = `https://abdur-rahman-shoes-web-app.vercel.app/api/admin/product/${modelNumber.trim().toUpperCase()}`;
+      
+      const response = await fetch(FETCH_URL, { method: "GET" });
+      const result = await response.json();
 
-  // Helper stock adjustment logic
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || "Model number could not be recognized.");
+      }
+
+      // Expecting result.data to contain: { prodName, prodCode, selectedCategory, sizeQuantities: { "39": "4", "40": "12" } }
+      setProductDetails(result.data);
+      setRestockUpdates({}); // Reset working edit buffer
+      setHasFetched(true);
+    } catch (error) {
+      console.error("Fetch operation fault:", error);
+      Alert.alert("Profile Lookup Failed", error.message || "Network error looking up product code ledger.");
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  // Helper adjustment logic
   const handleQtyChange = (size, changeAmt) => {
     const baseStock = parseInt(productDetails?.sizeQuantities?.[size] || 0, 10);
     const currentModifier = restockUpdates[size] || 0;
@@ -102,33 +85,13 @@ const handleFetchProduct = async () => {
     }));
   };
 
-  // Safe pricing pattern filter rules
-  const handlePriceInput = (text, type) => {
-    const cleanedText = text.replace(/[^0-9.]/g, "");
-    // Prevent double decimals
-    if ((cleanedText.match(/\./g) || []).length > 1) return;
-    
-    if (type === "cost") {
-      setCostPrice(cleanedText);
-    } else {
-      setSellingPrice(cleanedText);
-    }
-  };
-
-  // 2. Transmit updated quantity structures and pricing shifts
+  // 2. Transmit updated quantity structures
   const handleFormSubmit = async () => {
-    // Check structural volume adjustments alterations
+    // Check if any actual alterations were registered
     const changedSizes = Object.keys(restockUpdates).filter(size => restockUpdates[size] !== 0);
     
-    // Check if absolute values for pricing fields vary from what was originally fetched
-    const isCostChanged = costPrice !== productDetails.costPrice;
-    const isSellingChanged = sellingPrice !== productDetails.sellingPrice;
-
-    if (changedSizes.length === 0 && !isCostChanged && !isSellingChanged) {
-      Alert.alert(
-        "No Changes Detected", 
-        "Please modify at least one structural size quantity level or update a pricing field before submitting."
-      );
+    if (changedSizes.length === 0) {
+      Alert.alert("No Shifts Registered", "Please modify at least one structural inventory sizing row before submitting adjustments.");
       return;
     }
 
@@ -144,15 +107,14 @@ const handleFetchProduct = async () => {
       const payload = {
         formType: "restock_existing",
         prodCode: productDetails.prodCode.toUpperCase(),
-        quantityChanges: sizePayload,
-        costPrice: isCostChanged ? costPrice : undefined,
-        sellingPrice: isSellingChanged ? sellingPrice : undefined,
+        category: productDetails.selectedCategory,
+        quantityChanges: sizePayload, // Transmit delta shifts (+/- adjustments)
       };
 
-      const UPDATE_URL = `${API_URL}/api/admin/product`; 
+      const UPDATE_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/product/restock"; 
 
       const response = await fetch(UPDATE_URL, {
-        method: "PATCH",
+        method: "PATCH", // Using PATCH since it represents a localized update operation
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -163,18 +125,16 @@ const handleFetchProduct = async () => {
         throw new Error(result.message || result.error || "Server rejected transaction logic.");
       }
 
-      Alert.alert("Inventory Synced", "Catalog storage counts and profile metrics successfully updated.");
+      Alert.alert("Inventory Synced", "Existing catalog storage counts successfully incremented.");
       
       // Complete state refresh
       setHasFetched(false);
       setProductDetails(null);
       setRestockUpdates({});
-      setCostPrice("");
-      setSellingPrice("");
       setModelNumber("");
     } catch (error) {
       console.error("Network sync fault:", error);
-      Alert.alert("Sync Operation Failed", error.message || "Could not patch values into database record path.");
+      Alert.alert("Sync Operation Failed", error.message || "Could not patch values into transaction cluster paths.");
     } finally {
       setIsSubmitting(false);
     }
@@ -235,7 +195,7 @@ const handleFetchProduct = async () => {
           <View style={[styles.cardForm, { marginTop: 20 }]}>
             {/* Meta Info Header */}
             <View style={styles.metaBadgeRow}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
+              <View>
                 <Text style={styles.metaTitleText}>{productDetails.prodName}</Text>
                 <Text style={styles.metaSKUText}>SKU: {productDetails.prodCode}</Text>
               </View>
@@ -244,43 +204,7 @@ const handleFetchProduct = async () => {
               </View>
             </View>
 
-            {/* Price Profile Section */}
             <Text style={[styles.inputLabel, { marginTop: 10, marginBottom: 12 }]}>
-              Update Financial Matrix Fields
-            </Text>
-            <View style={styles.priceRowContainer}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.priceInputSubLabel}>Cost Price ($)</Text>
-                <View style={styles.priceInputBox}>
-                  <TextInput
-                    style={styles.priceTextInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    value={costPrice}
-                    onChangeText={(text) => handlePriceInput(text, "cost")}
-                    editable={!isSubmitting}
-                  />
-                </View>
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text style={styles.priceInputSubLabel}>Selling Price ($)</Text>
-                <View style={styles.priceInputBox}>
-                  <TextInput
-                    style={styles.priceTextInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    value={sellingPrice}
-                    onChangeText={(text) => handlePriceInput(text, "selling")}
-                    editable={!isSubmitting}
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <Text style={[styles.inputLabel, { marginBottom: 12 }]}>
               Modify Size Matrix Configurations
             </Text>
 
@@ -350,7 +274,7 @@ const handleFetchProduct = async () => {
               ) : (
                 <>
                   <Ionicons name="cloud-upload-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitActionBtnText}>Update Product Ledger</Text>
+                  <Text style={styles.submitActionBtnText}>Update Storage Metrics</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -383,13 +307,6 @@ const styles = StyleSheet.create({
   categoryTag: { backgroundColor: "#E6F4EA", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   categoryTagText: { fontSize: 11, color: "#059669", fontWeight: "700" },
   
-  // Price formatting layout styles
-  priceRowContainer: { flexDirection: "row", gap: 12, marginBottom: 10 },
-  priceInputSubLabel: { fontSize: 11, fontWeight: "600", color: "#64748B", marginBottom: 4 },
-  priceInputBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, height: 40, paddingHorizontal: 10 },
-  priceTextInput: { flex: 1, color: "#0F172A", fontSize: 14, fontWeight: "600" },
-  divider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 16 },
-
   // Row Matrix presentation
   matrixContainer: { marginBottom: 20 },
   sizeStockRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F8FAFC" },
@@ -398,7 +315,7 @@ const styles = StyleSheet.create({
   currentStockLabel: { fontSize: 11, color: "#64748B", marginTop: 1 },
   
   // Custom Inline Counter structures
-  counterControlWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 8, height: 38, paddingHorizontal: 4 },
+  counterControlWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 8, height: 36, paddingHorizontal: 4 },
   miniCounterBtn: { width: 28, height: 28, borderRadius: 6, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
   miniCounterInput: { width: 45, fontSize: 14, fontWeight: "700", color: "#0F172A", height: "100%" },
   

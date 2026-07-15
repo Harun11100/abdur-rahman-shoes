@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Image } from "react-native";
 
 const BACKEND_URL = "https://abdur-rahman-shoes-web-app.vercel.app/api/admin/getProducts";
 const LIMIT = 10;
@@ -60,6 +61,7 @@ export default function ManageCatalog() {
           costPrice: String(prod.costPrice || "0"),
           sellingPrice: String(prod.sellingPrice || "0"),
           sizes: prod.sizeQuantities || prod.sizes || {},
+          image: prod.images?.[0]?.url || prod.image || "https://via.placeholder.com/150",
         }));
 
         setCatalogItems((prevItems) => (append ? [...prevItems, ...products] : products));
@@ -179,6 +181,7 @@ export default function ManageCatalog() {
   };
 
   const renderProductCard = ({ item }) => {
+    console.log("Rendering Product Card:", item);
     const totalStock = getTotalPairs(item.sizes);
     const costPriceNum = parseInt(item.costPrice, 10) || 0;
     const sellingPriceNum = parseInt(item.sellingPrice, 10) || 0;
@@ -186,6 +189,10 @@ export default function ManageCatalog() {
     return (
       <View style={styles.catalogCard}>
         <View style={styles.cardHeader}>
+        <Image
+            source={{ uri:item.image }}
+            style={{ width: 60, height: 60, borderRadius: 8, marginRight: 12 }}
+          />
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
             <Text style={styles.productSku}>{item.sku} • <Text style={styles.colorwayText}>{item.colorway}</Text></Text>
@@ -273,7 +280,7 @@ export default function ManageCatalog() {
           <Ionicons name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search catalog by model name, variant or SKU..."
+            placeholder="Search catalog by model or SKU..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
