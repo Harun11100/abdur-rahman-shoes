@@ -192,6 +192,7 @@ const formatDate = (dateString) => {
     { title: "Add Product", icon: "add-circle-outline", color: "#10B981", path: "/products/addNewProduct", roles: ["admin"] },
     { title: "Manager Accounts", icon: "people-outline", color: "#8B5CF6", path: "/admin/users", roles: ["admin"] },
     { title: "Sales History", icon: "time-outline", color: "#F97316", path: "/history/daily", roles: ["admin", "manager"] },
+    {title: "Due Collections", icon: "cash-outline", color: "#F59E0B", path: "/products/dueCollection", roles: ["admin", "manager"] }
   ];
 
   const filteredActions = quickActions.filter(action => action.roles.includes(userRole));

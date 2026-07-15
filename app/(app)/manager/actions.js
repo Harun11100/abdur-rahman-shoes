@@ -50,6 +50,11 @@ export default function ManagerActions() {
   const [purchaseQty, setPurchaseQty] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Customer & Payment Status Input Fields
+  const [customerName, setCustomerName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("Paid"); // 'Paid' | 'Pending'
+
   // State tracking for the negotiable unit price input
   const [customPriceInput, setCustomPriceInput] = useState("");
 
@@ -111,8 +116,6 @@ export default function ManagerActions() {
     setIsSubmitting(true);
     try {
       const payloadSchemaSizesObj = convertArrayToSchemaObject(updatedVariants);
-     
-    
 
       const response = await fetch(`${API_URL}/api/dashboard/sync-invoice`, {
         method: "POST",
@@ -163,6 +166,9 @@ export default function ManagerActions() {
               // 2. FIXED: Local memory updates cleanly without being wiped out by the initial useEffect hook
               setLocalStockVariants(updatedVariants);
               setPurchaseQty(1);
+              setCustomerName("");
+              setPhoneNumber("");
+              setPaymentStatus("Paid");
             }
           },
         ]
@@ -197,7 +203,7 @@ export default function ManagerActions() {
 
     Alert.alert(
       "Confirm Sale Transaction",
-      `Are you sure you want to log a sale for:\n${purchaseQty}x ${params.name}\nSize: ${activeSizeObj.size}\nFinal Unit Price: ৳${finalUnitPrice.toLocaleString()}\nTotal Price: ৳${totalTransactionAmount.toLocaleString()}`,
+      `Are you sure you want to log a sale for:\n${purchaseQty}x ${params.name}\nSize: ${activeSizeObj.size}\nStatus: ${paymentStatus}\nFinal Unit Price: ৳${finalUnitPrice.toLocaleString()}\nTotal Price: ৳${totalTransactionAmount.toLocaleString()}`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -216,7 +222,9 @@ export default function ManagerActions() {
               items: `${params.name} (Size ${activeSizeObj.size}) x${purchaseQty}`,
               amount: totalTransactionAmount, // Captures final negotiated total metrics
               time: "Just now",
-              status: "Paid",
+              status: paymentStatus,
+              customerName: customerName.trim() || "Walk-in Customer",
+              customerPhone: phoneNumber.trim() || "N/A",
             };
 
             executeApiSync(updatedVariants, dynamicInvoiceRecord);
@@ -227,201 +235,279 @@ export default function ManagerActions() {
   };
 
   return (
-       <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    style={{ flex: 1 }}>
-    <SafeAreaView style={styles.safeContainer}>
-      <StatusBar barStyle="dark-content" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}>
+      <SafeAreaView style={styles.safeContainer}>
+        <StatusBar barStyle="dark-content" />
 
-      <View style={styles.headerRibbon}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} disabled={isSubmitting}>
-          <Ionicons name="arrow-back-outline" size={22} color={isSubmitting ? "#CBD5E1" : "#0F172A"} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleGroup}>
-          <Text style={styles.screenHeading}>Product Control Sheet</Text>
-          <Text style={styles.screenSubheading}>Stock reconciliation, direct point-of-sale logs</Text>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {hasSearchedProduct ? (
-          <View style={styles.mainCardContainer}>
-            
-            {/* Target Product Identity Metadata Panel */}
-        <View style={styles.productFocusCard}>
-  <View style={styles.productFocusHeader}>
-    {/* Product Image & Meta Column */}
-    <View style={styles.productMetaContainer}>
-      {params.productImage && (
-        <Image
-          source={{ uri: params.productImage }}
-          style={styles.productImage}
-        />
-      )}
-
-      <View style={styles.productTextColumn}>
-        <View style={styles.searchMatchBadge}>
-          <Ionicons name="checkmark-circle-sharp" size={13} color="#059669" />
-          <Text style={styles.searchMatchText}>Match Confirmed</Text>
+        <View style={styles.headerRibbon}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} disabled={isSubmitting}>
+            <Ionicons name="arrow-back-outline" size={22} color={isSubmitting ? "#CBD5E1" : "#0F172A"} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleGroup}>
+            <Text style={styles.screenHeading}>Product Control Sheet</Text>
+            <Text style={styles.screenSubheading}>Stock reconciliation, direct point-of-sale logs</Text>
+          </View>
         </View>
 
-        <Text style={styles.productNameText} numberOfLines={2}>
-          {params.name}
-        </Text>
-        
-        <Text style={styles.modelSkuText}>
-          SKU • <Text style={styles.skuHighlight}>{params.model}</Text>
-        </Text>
-      </View>
-    </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {hasSearchedProduct ? (
+            <View style={styles.mainCardContainer}>
+              
+              {/* Target Product Identity Metadata Panel */}
+              <View style={styles.productFocusCard}>
+                <View style={styles.productFocusHeader}>
+                  {/* Product Image & Meta Column */}
+                  <View style={styles.productMetaContainer}>
+                    {params.productImage && (
+                      <Image
+                        source={{ uri: params.productImage }}
+                        style={styles.productImage}
+                      />
+                    )}
 
-    {/* Pricing Footer Strip */}
-    <View style={styles.priceStrip}>
-      <Text style={styles.priceUnitLabel}>Original Unit Retail</Text>
-      <Text style={styles.productPriceTag}>
-        ৳{defaultUnitPrice.toLocaleString()}
-      </Text>
-    </View>
-  </View>
-</View>
+                    <View style={styles.productTextColumn}>
+                      <View style={styles.searchMatchBadge}>
+                        <Ionicons name="checkmark-circle-sharp" size={13} color="#059669" />
+                        <Text style={styles.searchMatchText}>Match Confirmed</Text>
+                      </View>
 
-            {/* Size Variant Picker Segment */}
-            <View style={styles.variantsSelectorSection}>
-              <Text style={styles.sectionLabel}>Select Customer Size Focus</Text>
-              <View style={styles.sizeChipsRow}>
-                {localStockVariants.map((item, index) => {
-                  const isSelected = index === selectedSizeIndex;
-                  const isOutOfStock = item.quantity <= 0;
-
-                  return (
-                    <TouchableOpacity
-                      key={item.size}
-                      activeOpacity={0.7}
-                      // 3. FIXED: Prevent interaction completely if the size is out of stock or loading
-                      disabled={isOutOfStock || isSubmitting}
-                      style={[
-                        styles.sizeChipItem,
-                        isSelected && styles.sizeChipItemSelected,
-                        isOutOfStock && styles.sizeChipItemDisabled,
-                      ]}
-                      onPress={() => setSelectedSizeIndex(index)}
-                    >
-                      <Text style={[
-                        styles.sizeChipText,
-                        isSelected && styles.sizeChipTextSelected,
-                        isOutOfStock && styles.sizeChipTextDisabled
-                      ]}>
-                        EU {item.size}
+                      <Text style={styles.productNameText} numberOfLines={2}>
+                        {params.name}
                       </Text>
-                      <Text style={[
-                        styles.sizeChipQtyText,
-                        isSelected && styles.sizeChipQtyTextSelected,
-                        isOutOfStock && styles.sizeChipQtyTextDisabled
-                      ]}>
-                        {isOutOfStock ? "Out" : `${item.quantity} left`}
+                      
+                      <Text style={styles.modelSkuText}>
+                        SKU • <Text style={styles.skuHighlight}>{params.model}</Text>
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Purchase Quantity Controls */}
-            {activeSizeObj && activeSizeObj.quantity > 0 && (
-              <View style={styles.adjustmentBlock}>
-                <Text style={styles.adjustmentLabel}>
-                  Select Purchase Quantity
-                </Text>
-                <View style={styles.counterRow}>
-                  <TouchableOpacity 
-                    style={[styles.counterButton, (purchaseQty <= 1 || isSubmitting) && styles.counterButtonDisabled]}
-                    onPress={() => handleUpdatePurchaseQty("decrease")}
-                    disabled={purchaseQty <= 1 || isSubmitting}
-                  >
-                    <Ionicons name="remove-outline" size={20} color={purchaseQty <= 1 ? "#CBD5E1" : "#475569"} />
-                  </TouchableOpacity>
-                  
-                  <View style={styles.counterValueContainer}>
-                    <Text style={styles.counterValueText}>{purchaseQty}</Text>
+                    </View>
                   </View>
 
-                  <TouchableOpacity 
-                    style={[styles.counterButton, (purchaseQty >= activeSizeObj.quantity || isSubmitting) && styles.counterButtonDisabled]}
-                    onPress={() => handleUpdatePurchaseQty("increase")}
-                    disabled={purchaseQty >= activeSizeObj.quantity || isSubmitting}
-                  >
-                    <Ionicons name="add-outline" size={20} color={purchaseQty >= activeSizeObj.quantity ? "#CBD5E1" : "#475569"} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Custom Negotiated Price Input Section */}
-            {activeSizeObj && activeSizeObj.quantity > 0 && (
-            
-              <View style={styles.negotiationBlock}>
-                <Text style={styles.adjustmentLabel}>Negotiated Price per Unit (৳)</Text>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.currencyPrefix}>৳</Text>
-                  <TextInput
-                    style={styles.priceInputField}
-                    keyboardType="numeric"
-                    placeholder="Enter final selling price..."
-                    value={customPriceInput}
-                    onChangeText={(text) => setCustomPriceInput(text.replace(/[^0-9.]/g, ""))}
-                    editable={!isSubmitting}
-                  />
-                  {finalUnitPrice !== defaultUnitPrice && (
-                    <TouchableOpacity 
-                      style={styles.resetPriceBtn} 
-                      onPress={() => setCustomPriceInput(defaultUnitPrice.toString())}
-                    >
-                      <Text style={styles.resetPriceText}>Reset</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              
-            )}
-          
-
-            {/* Point of Sale Submission Footer */}
-            <View style={styles.actionPanelWrapper}>
-              <TouchableOpacity 
-                style={[
-                  styles.primarySellButton, 
-                  (activeSizeObj?.quantity <= 0 || finalUnitPrice <= 0 || isSubmitting) && styles.disabledSellButton
-                ]} 
-                onPress={handleProcessSale}
-                disabled={activeSizeObj?.quantity <= 0 || finalUnitPrice <= 0 || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="cart-outline" size={20} color="#FFF" style={styles.buttonIconSpace} />
-                    <Text style={styles.primarySellButtonText}>
-                      {activeSizeObj?.quantity <= 0 
-                        ? "Selected Size Out of Stock" 
-                        : `Register Sale • ৳${totalTransactionAmount.toLocaleString()}`}
+                  {/* Pricing Footer Strip */}
+                  <View style={styles.priceStrip}>
+                    <Text style={styles.priceUnitLabel}>Original Unit Retail</Text>
+                    <Text style={styles.productPriceTag}>
+                      ৳{defaultUnitPrice.toLocaleString()}
                     </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+                  </View>
+                </View>
+              </View>
 
-          </View>
-        ) : (
-          <View style={styles.emptyStateContainer}>
-            <Ionicons name="search-circle-outline" size={64} color="#94A3B8" />
-            <Text style={styles.emptyStateTitle}>No Product Targeted</Text>
-            <Text style={styles.emptyStateMessage}>
-              Please search for a product model code via the Main Dashboard view to execute manager inventory actions.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+              {/* Size Variant Picker Segment */}
+              <View style={styles.variantsSelectorSection}>
+                <Text style={styles.sectionLabel}>Select Customer Size Focus</Text>
+                <View style={styles.sizeChipsRow}>
+                  {localStockVariants.map((item, index) => {
+                    const isSelected = index === selectedSizeIndex;
+                    const isOutOfStock = item.quantity <= 0;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.size}
+                        activeOpacity={0.7}
+                        disabled={isOutOfStock || isSubmitting}
+                        style={[
+                          styles.sizeChipItem,
+                          isSelected && styles.sizeChipItemSelected,
+                          isOutOfStock && styles.sizeChipItemDisabled,
+                        ]}
+                        onPress={() => setSelectedSizeIndex(index)}
+                      >
+                        <Text style={[
+                          styles.sizeChipText,
+                          isSelected && styles.sizeChipTextSelected,
+                          isOutOfStock && styles.sizeChipTextDisabled
+                        ]}>
+                          EU {item.size}
+                        </Text>
+                        <Text style={[
+                          styles.sizeChipQtyText,
+                          isSelected && styles.sizeChipQtyTextSelected,
+                          isOutOfStock && styles.sizeChipQtyTextDisabled
+                        ]}>
+                          {isOutOfStock ? "Out" : `${item.quantity} left`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Purchase Quantity Controls */}
+              {activeSizeObj && activeSizeObj.quantity > 0 && (
+                <View style={styles.adjustmentBlock}>
+                  <Text style={styles.adjustmentLabel}>
+                    Select Purchase Quantity
+                  </Text>
+                  <View style={styles.counterRow}>
+                    <TouchableOpacity 
+                      style={[styles.counterButton, (purchaseQty <= 1 || isSubmitting) && styles.counterButtonDisabled]}
+                      onPress={() => handleUpdatePurchaseQty("decrease")}
+                      disabled={purchaseQty <= 1 || isSubmitting}
+                    >
+                      <Ionicons name="remove-outline" size={20} color={purchaseQty <= 1 ? "#CBD5E1" : "#475569"} />
+                    </TouchableOpacity>
+                    
+                    <View style={styles.counterValueContainer}>
+                      <Text style={styles.counterValueText}>{purchaseQty}</Text>
+                    </View>
+
+                    <TouchableOpacity 
+                      style={[styles.counterButton, (purchaseQty >= activeSizeObj.quantity || isSubmitting) && styles.counterButtonDisabled]}
+                      onPress={() => handleUpdatePurchaseQty("increase")}
+                      disabled={purchaseQty >= activeSizeObj.quantity || isSubmitting}
+                    >
+                      <Ionicons name="add-outline" size={20} color={purchaseQty >= activeSizeObj.quantity ? "#CBD5E1" : "#475569"} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Custom Negotiated Price Input Section */}
+              {activeSizeObj && activeSizeObj.quantity > 0 && (
+                <View style={styles.negotiationBlock}>
+                  <Text style={styles.adjustmentLabel}>Negotiated Price per Unit (৳)</Text>
+                  <View style={styles.inputWrapper}>
+                    <Text style={styles.currencyPrefix}>৳</Text>
+                    <TextInput
+                      style={styles.priceInputField}
+                      keyboardType="numeric"
+                      placeholder="Enter final selling price..."
+                      value={customPriceInput}
+                      onChangeText={(text) => setCustomPriceInput(text.replace(/[^0-9.]/g, ""))}
+                      editable={!isSubmitting}
+                    />
+                    {finalUnitPrice !== defaultUnitPrice && (
+                      <TouchableOpacity 
+                        style={styles.resetPriceBtn} 
+                        onPress={() => setCustomPriceInput(defaultUnitPrice.toString())}
+                      >
+                        <Text style={styles.resetPriceText}>Reset</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Optional Customer Information Block */}
+              {activeSizeObj && activeSizeObj.quantity > 0 && (
+                <View style={styles.customerBlock}>
+                  <Text style={styles.adjustmentLabel}>Customer Details (Optional)</Text>
+                  
+                  <View style={styles.formGroup}>
+                    <TextInput
+                      style={styles.formInputField}
+                      placeholder="Customer Name"
+                      placeholderTextColor="#94A3B8"
+                      value={customerName}
+                      onChangeText={setCustomerName}
+                      editable={!isSubmitting}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <TextInput
+                      style={styles.formInputField}
+                      placeholder="Phone Number"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                      value={phoneNumber}
+                      onChangeText={setPhoneNumber}
+                      editable={!isSubmitting}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Payment Status Segment Toggle Button */}
+              {activeSizeObj && activeSizeObj.quantity > 0 && (
+                <View style={styles.statusToggleBlock}>
+                  <Text style={styles.adjustmentLabel}>Payment Status</Text>
+                  <View style={styles.toggleRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      disabled={isSubmitting}
+                      onPress={() => setPaymentStatus("Paid")}
+                      style={[
+                        styles.toggleButton,
+                        styles.toggleLeft,
+                        paymentStatus === "Paid" && styles.toggleButtonPaidActive,
+                      ]}
+                    >
+                      <Ionicons 
+                        name="checkmark-circle" 
+                        size={16} 
+                        color={paymentStatus === "Paid" ? "#FFF" : "#64748B"} 
+                        style={styles.toggleIcon} 
+                      />
+                      <Text style={[
+                        styles.toggleButtonText,
+                        paymentStatus === "Paid" && styles.toggleButtonTextActive,
+                      ]}>Paid</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      disabled={isSubmitting}
+                      onPress={() => setPaymentStatus("Pending")}
+                      style={[
+                        styles.toggleButton,
+                        styles.toggleRight,
+                        paymentStatus === "Pending" && styles.toggleButtonPendingActive,
+                      ]}
+                    >
+                      <Ionicons 
+                        name="time" 
+                        size={16} 
+                        color={paymentStatus === "Pending" ? "#FFF" : "#64748B"} 
+                        style={styles.toggleIcon} 
+                      />
+                      <Text style={[
+                        styles.toggleButtonText,
+                        paymentStatus === "Pending" && styles.toggleButtonTextActive,
+                      ]}>Pending</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Point of Sale Submission Footer */}
+              <View style={styles.actionPanelWrapper}>
+                <TouchableOpacity 
+                  style={[
+                    styles.primarySellButton, 
+                    (activeSizeObj?.quantity <= 0 || finalUnitPrice <= 0 || isSubmitting) && styles.disabledSellButton
+                  ]} 
+                  onPress={handleProcessSale}
+                  disabled={activeSizeObj?.quantity <= 0 || finalUnitPrice <= 0 || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="cart-outline" size={20} color="#FFF" style={styles.buttonIconSpace} />
+                      <Text style={styles.primarySellButtonText}>
+                        {activeSizeObj?.quantity <= 0 
+                          ? "Selected Size Out of Stock" 
+                          : `Register Sale • ৳${totalTransactionAmount.toLocaleString()}`}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+            </View>
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="search-circle-outline" size={64} color="#94A3B8" />
+              <Text style={styles.emptyStateTitle}>No Product Targeted</Text>
+              <Text style={styles.emptyStateMessage}>
+                Please search for a product model code via the Main Dashboard view to execute manager inventory actions.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
@@ -436,11 +522,11 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   
   mainCardContainer: { backgroundColor: "#FFF", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
- productFocusCard: {
+  productFocusCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0", // Soft slate border
+    borderColor: "#E2E8F0", 
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -452,13 +538,12 @@ const styles = StyleSheet.create({
   productFocusHeader: {
     padding: 16,
   },
-  // Row for Image + Text Column
   productMetaContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9", // Crisp separator line
+    borderBottomColor: "#F1F5F9", 
   },
   productImage: {
     width: 110,
@@ -473,12 +558,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
-  // Badge Style (Pill shape, softer greens)
   searchMatchBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "#ECFDF5", // Soft emerald tint
+    backgroundColor: "#ECFDF5", 
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
@@ -495,20 +579,19 @@ const styles = StyleSheet.create({
   productNameText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A", // Dark Slate
+    color: "#0F172A", 
     lineHeight: 22,
     marginBottom: 4,
   },
   modelSkuText: {
     fontSize: 12,
-    color: "#64748B", // Cool Grey
+    color: "#64748B", 
     fontWeight: "500",
   },
   skuHighlight: {
     color: "#0F172A",
     fontWeight: "700",
   },
-  // Bottom Price Alignment Bar
   priceStrip: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -534,6 +617,7 @@ const styles = StyleSheet.create({
   sizeChipItemSelected: { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" },
   sizeChipItemDisabled: { backgroundColor: "#F1F5F9", borderColor: "#E2E8F0", opacity: 0.5 },
   sizeChipText: { fontSize: 14, fontWeight: "700", color: "#334155" },
+  sizeChipItemSelectedSelected: { color: "#3B82F6" },
   sizeChipTextSelected: { color: "#3B82F6" },
   sizeChipTextDisabled: { color: "#94A3B8", textDecorationLine: "line-through" },
   sizeChipQtyText: { fontSize: 10, color: "#64748B", marginTop: 2, fontWeight: "500" },
@@ -555,8 +639,20 @@ const styles = StyleSheet.create({
   resetPriceBtn: { backgroundColor: "#F1F5F9", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   resetPriceText: { fontSize: 12, fontWeight: "600", color: "#475569" },
 
-  statusContextBox: { flexDirection: "row", alignItems: "center", marginHorizontal: 20, marginBottom: 20, padding: 12, backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#F1F5F9" },
-  statusContextText: { fontSize: 12, color: "#475569", marginLeft: 8, fontWeight: "500", flex: 1 },
+  customerBlock: { paddingHorizontal: 20, paddingBottom: 20 },
+  formGroup: { marginBottom: 10 },
+  formInputField: { height: 46, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 10, paddingHorizontal: 14, fontSize: 14, color: "#0F172A", backgroundColor: "#FFF" },
+
+  statusToggleBlock: { paddingHorizontal: 20, paddingBottom: 24 },
+  toggleRow: { flexDirection: "row", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, overflow: "hidden", backgroundColor: "#F8FAFC" },
+  toggleButton: { flex: 1, flexDirection: "row", height: 44, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
+  toggleLeft: { borderRightWidth: 1, borderRightColor: "#E2E8F0" },
+  toggleRight: {},
+  toggleButtonPaidActive: { backgroundColor: "#10B981" },
+  toggleButtonPendingActive: { backgroundColor: "#F59E0B" },
+  toggleIcon: { marginRight: 6 },
+  toggleButtonText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
+  toggleButtonTextActive: { color: "#FFF" },
 
   actionPanelWrapper: { padding: 20, borderTopWidth: 1, borderColor: "#F1F5F9", backgroundColor: "#FCFCFD" },
   primarySellButton: { flexDirection: "row", backgroundColor: "#10B981", height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
